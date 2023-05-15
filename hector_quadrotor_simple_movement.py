@@ -141,13 +141,10 @@ def takeoff(): #Takeoff function
 	while(cord[2] < takeoff_alt-0.1):
 		velocity_publisher.publish(vel)
 		ref_pub.publish(msgs_ref)
-		
-		#print(', '.join(str(elem) for elem in cord))
-		rate.sleep(); #rospy.sleep(0.1)
+		rate.sleep(); 
 		key = getKey()
 		if(key == 'q'):
-			break
-	
+			break	
 	movement(motor_off)
 	velocity_publisher.publish(vel)
 	ref_pub.publish(msgs_ref)
@@ -160,12 +157,7 @@ def land(): #Land function
 	
 	while(cord[2] > 0.3):
 		velocity_publisher.publish(vel)
-		# error_pub.publish(m_ex)
-		# derivadas.publish(m_dex)
-		# integrales.publish(m_iex)
-		#print(', '.join(str(elem) for elem in cord))
-		rate.sleep(); #rospy.sleep(0.1)
-	
+		rate.sleep(); 	
 	movement(motor_off)
 	velocity_publisher.publish(vel)	
 	 
