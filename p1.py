@@ -46,7 +46,7 @@ def enable_motors(): #Function to call "/enable_motors" service, needed to move 
 
 # msg_takeoff, msg_land = Empty(),Empty()
 msgs_ref = Vector3()
-m_ex, m_dex, m_iex, m_pid, m_ex0= Twist(), Twist(), Twist(), Twist(), Twist()
+m_ex, m_dex, m_iex, m_pid, m_ex0, vel = Twist(), Twist(), Twist(), Twist(), Twist(), Twist()
 
 #definicion de las constantes para el control en x-y-z-yaw
 kp = [0.25, 0.25, 0.5, 1.5]
@@ -63,14 +63,10 @@ ex = [0,0,0,0]
 ex0 = [0,0,0,0]
 d_ex = [0,0,0,0]
 i_ex = [0,0,0,0]
-
 #senales de salida del controlador PID
 pid = [0,0,0,0]
 i_saturacion = 500 # saturacion en controlador I
-velineal = [0,0,0]  #velocidades lineales y angulos RPY
-rpy_ang = [0,0,0]
-
-vel = Twist() #Create Twist message instance
+tiempo = 0
 
 def actualiza(v,valor):
       v.x = valor[0]
@@ -81,7 +77,7 @@ def actualiza(v,valor):
 def poseCallback(msg): #Callback function to get the drone posture
         global cord
         pos = msg.pose.pose.position
-        cord[:3] = [pos.x, pos.y, pos.z]
+        cord[:3] = [pos.x, pos.y, pos.z]       
         quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
         (r,p,cord[3]) = euler_from_quaternion(quater_list) #Euler angles are given in radians
@@ -126,22 +122,34 @@ def PID():
     m_pid.angular = actualiza(m_pid.angular,[0,0,pid[3]]) 
 
 def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
-        vel.linear.x = v[0]
-        vel.linear.y = v[1]
-        vel.linear.z = v[2]
-        vel.angular.z = v[3]         
+        vel.linear = actualiza(vel.linear,v)
+        vel.angular = actualiza(vel.angular,[0,0,v[3]])  
 
+def trayectoria():
+     global msgs_ref, tiempo
+     tiempo +=1
+     if tiempo == 1:
+       msgs_ref = actualiza(msgs_ref,[0,0,2])
+     elif tiempo == 2:
+        msgs_ref = actualiza(msgs_ref,[0,2,2])
+     elif tiempo == 3:
+        msgs_ref = actualiza(msgs_ref,[2,2,2])
+     elif tiempo == 3:
+        msgs_ref = actualiza(msgs_ref,[2,0,2])
+     elif tiempo == 4: 
+        msgs_ref = actualiza(msgs_ref,[0,0,2])
+     else: msgs_ref = actualiza(msgs_ref,[0,0,0])
+     print(tiempo)
+
+        
 def main_function():
-	global msgs_ref, deseadas, ex, ex0       
-	# xd = float(input("intro xd: "))
-	# yd = float(input("intro yd: "))
-	# zd = float(input("intro zd: "))
-	msgs_ref = actualiza(msgs_ref,[0,0,2])	
-
-	rospy.init_node("hector_quadrotor_simple_movement", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
-	global rate
-	rate = rospy.Rate(50) #Node frequency (Hz)
+	global msgs_ref, deseadas, ex, ex0, rate       
+	msgs_ref = actualiza(msgs_ref,[0,0,0])	
 	counter = 0
+	key = ''
+
+	rospy.init_node("pid", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
+	rate = rospy.Rate(50) #Node frequency (Hz)
 	    
 	velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10) #To publish in the topic
 	ref_pub = rospy.Publisher("/referencias", Vector3, queue_size=100)
@@ -151,28 +159,22 @@ def main_function():
         
         
 	rospy.Subscriber('/ground_truth/state',Odometry, poseCallback) #To subscribe to the topic
-	rospy.Subscriber("/referencias", Vector3, refCallback, queue_size=100)
-	
+	rospy.Subscriber("/referencias", Vector3, refCallback, queue_size=100)	
 
 	enable_motors() #Execute the functions
-	movement(pid)	#Circular movement on the horizontal plane
-	
-	while(1):
+	while(key != 'q'):
 		error()
 		PID()
 		velocity_publisher.publish(vel) #Publish the velocities
 		ref_pub.publish(msgs_ref);ex0_pub.publish(m_ex0)
 		error_pub.publish(m_ex)
 		derivadas.publish(m_dex)
-		integrales.publish(m_iex);pid_pub.publish(m_pid);movement(pid)
-        
-        
-        #print(','.join(str(elem) for elem in cord))
+		integrales.publish(m_iex);pid_pub.publish(m_pid);movement(pid)#;print(','.join(str(elem) for elem in cord))
 		if counter == 50: counter = 0 #Frequency divisor			
 		else:counter += 1
-		rate.sleep() 
+		rate.sleep()
 		key = getKey()
-		if(key == 'q'):movement([0,0,-0.2,0]);break
+		if(np.all(np.abs(ex) < 0.001)):trayectoria()
 		        
 if __name__ == '__main__':
     if os.name != 'nt': settings = termios.tcgetattr(sys.stdin)
