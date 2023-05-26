@@ -47,7 +47,7 @@ def enable_motors(): #Function to call "/enable_motors" service, needed to move 
 # msg_takeoff, msg_land = Empty(),Empty()
 msgs_ref, msgs_rotacion  = Vector3(), Vector3()
 m_ex, m_dex, m_iex = Twist(), Twist(), Twist()
-odom_quaternion = Quaternion()
+
 
 #Define global variables (position and orientation, using Euler anlges)
 motor_off=[0,0,0,0] #x-y-z-yaw
@@ -183,7 +183,7 @@ def main_function():
 	ref_pub = rospy.Publisher("/referencias", Vector3, queue_size=100)
 	error_pub = rospy.Publisher("/errores", Twist, queue_size=100)
 	derivadas = rospy.Publisher("/derivadas", Twist, queue_size=100)
-	integrales = rospy.Publisher("/integrales", Twist, queue_size=100)
+	integrales = rospy.Publisher("/integrales", Twist, queue_size=100)    
         
 	rospy.Subscriber('/ground_truth/state',Odometry, poseCallback) #To subscribe to the topic
 	rospy.Subscriber("/referencias", Vector3, refCallback, queue_size=100)

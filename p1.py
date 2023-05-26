@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 import rospy
+import pyswarm as ps
 from hector_uav_msgs.srv import EnableMotors #rosservice info /enable_motors 
 from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
@@ -67,6 +68,7 @@ i_ex = [0,0,0,0]
 pid = [0,0,0,0]
 i_saturacion = 500 # saturacion en controlador I
 tiempo = 0
+count = 0
 
 def actualiza(v,valor):
       v.x = valor[0]
@@ -141,6 +143,12 @@ def trayectoria():
      else: msgs_ref = actualiza(msgs_ref,[0,0,0])
      print(tiempo)
 
+def cambio(ex):#checar
+    global count
+    if(np.all(np.abs(ex) < 0.05)):
+        count+=1
+    else: count = 0 
+    if(count == 10):print(ex);trayectoria()
         
 def main_function():
 	global msgs_ref, deseadas, ex, ex0, rate       
@@ -173,8 +181,8 @@ def main_function():
 		if counter == 50: counter = 0 #Frequency divisor			
 		else:counter += 1
 		rate.sleep()
-		key = getKey()
-		if(np.all(np.abs(ex) < 0.001)):trayectoria()
+		key = getKey(); cambio(ex)
+		# if(np.all(np.abs(ex) < 0.05)):trayectoria()
 		        
 if __name__ == '__main__':
     if os.name != 'nt': settings = termios.tcgetattr(sys.stdin)
