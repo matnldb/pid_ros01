@@ -52,13 +52,13 @@ print("kd =", xopt[1])
 print("ki =", xopt[2])
 print("Valor mnimo del error medio cuadrtico:", fopt)
 
-ex = deseada
-ex0 = 0
-ie = 0
-vectorx = [deseada]
-for _ in range(50):  
-    ex = deseada - pid(xopt[0], xopt[1], xopt[2], ex, ex0)
-    ex0 = vectorx[-1]
-    vectorx.append(ex) 
+# ex = deseada
+# ex0 = 0
+# ie = 0
+# vectorx = [deseada]
+# for _ in range(50):  
+#     ex = deseada - pid(xopt[0], xopt[1], xopt[2], ex, ex0)
+#     ex0 = vectorx[-1]
+#     vectorx.append(ex) 
 
-print(vectorx)
+# print(vectorx)

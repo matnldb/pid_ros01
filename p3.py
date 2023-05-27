@@ -48,7 +48,7 @@ def enable_motors(): #Function to call "/enable_motors" service, needed to move 
 # msg_takeoff, msg_land = Empty(),Empty()
 msgs_ref = Vector3()
 vel = Twist()
-
+velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 # posiciones actuales(x,y,z, quaternion_yaw) y deseadas 
 cord = [0,0,0,0]; i_ex = [0,0,0,0]; ex0 = [0,0,0,0]
 tiempo = 0
@@ -97,6 +97,7 @@ def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
 def trayectoria():
      global tiempo
      tiempo +=1
+     print(tiempo)
      if tiempo == 1:
        return [0,0,2,0]
      elif tiempo == 2:
@@ -107,7 +108,9 @@ def trayectoria():
         return [2,0,2,0]
      elif tiempo == 4: 
         return [0,0,2,0]
-     else: return [0,0,0,0]     
+     else: 
+         #tiempo=0;
+         return [0,0,0,0]     
 
 def cambio(ex):
     global count
@@ -116,6 +119,24 @@ def cambio(ex):
     else: count = 0 
     if(count == 10):return True
     else: return False
+
+def objective_function(x):
+    
+    global i_ex, velocity_publisher
+    # Coeficientes a optimizar
+    kp = x[:4]
+    kd = x[4:8]
+    ki = x[8:12]
+
+    ac2 = [0,0,0,0]
+
+    # Restaurar los valores iniciales de las variables
+    if(cambio(ex)):
+        deseadas = trayectoria()
+    ex = np.subtract(deseadas,cord)
+    movement(PID(kp,ki,kd,ex))
+    velocity_publisher.publish(vel) 
+    rate.sleep()    	
         
 def main_function():
 	global msgs_ref, ex, ex0, rate       
