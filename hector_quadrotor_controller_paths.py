@@ -224,14 +224,14 @@ def main_function():
 
 
 if __name__ == '__main__':
-    if os.name != 'nt':
-        settings = termios.tcgetattr(sys.stdin)
+		if os.name != 'nt':
+			settings = termios.tcgetattr(sys.stdin)
 
-    try:
-    	main_function()  #Execute the function
-	
-    except rospy.ROSInterruptException:
-        pass
+		try:
+			main_function()  #Execute the function
+		
+		except rospy.ROSInterruptException:
+			pass
 
-    #if os.name != 'nt':
-    #   termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+		#if os.name != 'nt':
+		#   termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
