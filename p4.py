@@ -97,7 +97,7 @@ def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
 
 def trayectoria():
      global tiempo,fin,i_ex
-     i_ex = 0
+     i_ex = [0,0,0,0]
      tiempo +=1
      #print(tiempo)
      if tiempo == 0:
@@ -134,9 +134,9 @@ def objective_function(x):
     kd = x[8:12]
     fin = True
     # tiempo = 0  
-    i_ex = 0 
-    Ja = 0 #error anterior
-    Ia = 0#integral del error anterior
+    i_ex = [0,0,0,0]
+    J0 = 0 #error anterior
+    J = 0#integral del error anterior
     deseadas = [0,0,0,0]
     ex = [0,0,0,0]
     print("kp: ",kp)
@@ -157,11 +157,12 @@ def objective_function(x):
             vector_traspuesto = ex.reshape(-1, 1)
             #print(vector_traspuesto)
             escalar = np.dot(ex,vector_traspuesto)[0]
-            Ia+= (escalar+Ja)*0.005            
-            Ja = escalar           
+            J+= (escalar+J0)*0.005
+            #print("camino",index, "J: ", J)            
+            J0 = escalar           
             rate.sleep()
-    print(Ia)
-    return Ia     	
+    print(J)
+    return J     	
         
 def main_function():
         global rate	

@@ -107,28 +107,28 @@ def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
 def trayectoria():
      global tiempo,fin,tr_path_msg,i_ex,t,t0
      tiempo +=1
-     i_ex = 0     
+     i_ex = [0,0,0,0]    
      t1 = rospy.Time.now().to_sec() - t0
      t0 = t1
      t += t1
-     if tiempo <6: print(t1)
+     #if tiempo <6: print(t1)
      if tiempo == 1: 
-       print("--:tiempo 1")  
+       print("--:tiempo 1",t1)  
        d = [0,0,2,0]
      elif tiempo == 2:
-        print("--:tiempo 2") 
+        print("--:tiempo 2",t1) 
         d =  [0,2,2,0]
      elif tiempo == 3:
-       print("--:tiempo 3") 
+       print("--:tiempo 3",t1) 
        d =  [2,2,2,0]
      elif tiempo == 4:
-        print("--:tiempo 4") 
+        print("--:tiempo 4",t1) 
         d =  [2,0,2,0]
      elif tiempo == 5: 
-        print("--:tiempo 5") 
+        print("--:tiempo 5",t1) 
         d =  [0,0,2,0]
      elif tiempo == 6: 
-        print("--:tiempo 6") 
+        print("--:tiempo 6",t1) 
         d =  [0,0,0,0]
      else: 
          print("--:tiempo total")         
@@ -169,9 +169,6 @@ def funcionCosto(ex):
 def cambio(ex):
     global count
     if(np.all(np.abs(ex) < 0.09)):
-        #     count+=1
-        # else: count = 0 
-        # if(count == 4):
         return True
     else: return False
         
@@ -179,11 +176,14 @@ def main_function():
         global msgs_ref, rate,fin,t0,tx   
         
         ex = [0,0,0,0]; 
-        kp = [0.25, 0.25, 0.5, 1.5]; kd = [0.05, 0.05, 0.05, 0]; ki = [0, 0 ,0, 0]
-        tx = rospy.Time.now().to_sec()
+        #kp = [0.25, 0.25, 0.5, 1.5]; kd = [0.05, 0.05, 0.05, 0]; ki = [0, 0 ,0, 0]
+        kp = [ 0.29060169,  0.22351094,  0.54439942,  1.53864866]
+        ki = [ 0.0493674 ,  0.05      ,  0.0378391 ,  0.00537379]
+        kd = [ 0.01099189,  0.06127233,  0.0423897 ,  0.04541789] 
         deseadas = [0,0,0,0]
         rospy.init_node("pid", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
         rate = rospy.Rate(50) #Node frequency (Hz)
+        tx = rospy.Time.now().to_sec()
             
         velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)         
         rospy.Subscriber('/ground_truth/state',Odometry, poseCallback) #To subscribe to the topic
