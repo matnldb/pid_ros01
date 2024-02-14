@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 import numpy as np
 import rospy
-import pyswarm as ps
-from hector_uav_msgs.srv import EnableMotors #rosservice info /enable_motors 
-from std_msgs.msg import Empty
+from hector_uav_msgs.srv import EnableMotors
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist, Vector3, Quaternion
+from geometry_msgs.msg import Twist, PoseStamped
 from tf.transformations import euler_from_quaternion
 
-#######################################################################################
-#kbhit function implemented on Linux
 import sys, select, os #Handling command line arguments
 if os.name == 'nt':
   import msvcrt
@@ -30,161 +26,108 @@ def getKey(): #Function to use keyboard events on Linux
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
-def enable_motors(): #Function to call "/enable_motors" service, needed to move the drone
-    SERVICE_ENABLE_MOTORS = "enable_motors"
-    print("Waiting for service", SERVICE_ENABLE_MOTORS)
-    rospy.wait_for_service(SERVICE_ENABLE_MOTORS)
-    try:
-        enable_motors = rospy.ServiceProxy(SERVICE_ENABLE_MOTORS, EnableMotors)
-        res = enable_motors(True)
-        if res:
-            print("Enable motors successful\n")
-        else:
-            print("Enable motors failed\n")
-    except rospy.ServiceException:
-    	print("Enable service", SERVICE_ENABLE_MOTORS, "call failed")
-#######################################################################################
-
-# msg_takeoff, msg_land = Empty(),Empty()
-msgs_ref = Vector3()
-m_ex, m_dex, m_iex, m_pid, m_ex0, vel = Twist(), Twist(), Twist(), Twist(), Twist(), Twist()
-
-#definicion de las constantes para el control en x-y-z-yaw
 kp = [0.25, 0.25, 0.5, 1.5]
 kd = [0.05, 0.05, 0.05, 0]
 ki = [0, 0 ,0, 0]
 
-# posiciones actuales(x,y,z, quaternion_yaw) y deseadas 
-cord = [0,0,0,0]
-deseadas = [0,0,0,0]
+class Drone(object):
+    def __init__(self):
+        self.vel = Twist()
+        self.cord = [0, 0, 0, 0]  # [x, y, z, yaw]
+        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.poseCallback)
+        self.enable_motors()  # Habilita los motores al inicializar el dron
+        self.takeoff_complete = False  # Bandera para indicar si el despegue ha sido completado
+        self.ex = [0, 0, 0, 0]
+        self.ex0 = [0, 0, 0, 0]
 
-#variables que almacenan el error actual (ex),el error anterior ex0
-# la derivada del error y la integral del error
-ex = [0,0,0,0]
-ex0 = [0,0,0,0]
-d_ex = [0,0,0,0]
-i_ex = [0,0,0,0]
-#senales de salida del controlador PID
-pid = [0,0,0,0]
-i_saturacion = 500 # saturacion en controlador I
-tiempo = 0
-count = 0
-
-def actualiza(v,valor):
-      v.x = valor[0]
-      v.y = valor[1]
-      v.z = valor[2]
-      return v
-
-def poseCallback(msg): #Callback function to get the drone posture
-        global cord
+    def poseCallback(self, msg):
         pos = msg.pose.pose.position
-        cord[:3] = [pos.x, pos.y, pos.z]       
+        self.cord[:3] = [pos.x, pos.y, pos.z]
         quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
-        (r,p,cord[3]) = euler_from_quaternion(quater_list) #Euler angles are given in radians
+        (_, _, self.cord[3]) = euler_from_quaternion(quater_list)
 
-def refCallback(msg):
-     global deseadas
-     deseadas[:3] = [msg.x,msg.y,msg.z]
+    def enable_motors(self):
+        rospy.wait_for_service('/enable_motors')
+        enable_motors = rospy.ServiceProxy('/enable_motors', EnableMotors)
+        enable_motors(True)
 
-def Saturacion(elemento, saturacion):
-    for i in range(4):
-        if elemento[i] > saturacion:
-            elemento[i] = saturacion
-        elif elemento[i] < -saturacion: 
-            elemento[i] = -saturacion
-    return elemento 
+    def take_off(self):
+        if not self.takeoff_complete:
+            # Si no se ha completado el despegue, ascender gradualmente hasta alcanzar 2 metros
+            if self.cord[2] < 2:
+                self.vel.linear.z = 0.1
+            else:
+                self.vel.linear.z = 0.0
+                self.takeoff_complete = True  # Marcar el despegue como completado
+        else:
+            self.vel.linear.z = 0.0  # El despegue ya ha sido completado, mantener la altitud constante
+    
+    def calculate_error(self, desired_position):
+        self.ex0 = self.ex
+        self.ex = np.subtract(desired_position, self.cord)
+        return self.ex
 
-def error():
-     global ex, m_ex, ex0, d_ex, i_ex
-     ex = np.subtract(deseadas,cord)    # calcula el error
-     d_ex = np.subtract(ex,ex0)*100     #calcula la derivada del error
-     i_ex = i_ex+np.add(ex, ex0)*0.005  #calcula la integral del error
-     ex0 = ex                           # actualiza el error anterior
-     i_ex = Saturacion(i_ex, i_saturacion) #limita el error por inetgracion
+    def PID(self, kp, ki, kd, error):
+        d_ex = np.subtract(error, self.ex0) * 100
+        p = np.multiply(error, kp)
+        d = np.multiply(d_ex, kd)
+        pid = np.add(p, d)
+        return pid
 
-     m_ex0.linear = actualiza(m_ex0.linear,ex0)
-     m_ex0.angular = actualiza(m_ex0.angular,[0,0,ex0[3]]) 
-     m_ex.linear = actualiza(m_ex.linear,ex)
-     m_ex.angular = actualiza(m_ex.angular,[0,0,ex[3]])
-     m_dex.linear = actualiza(m_dex.linear,d_ex)
-     m_dex.angular = actualiza(m_dex.angular,[0,0,d_ex[3]]) 
-     m_iex.linear = actualiza(m_iex.linear,i_ex)
-     m_iex.angular = actualiza(m_iex.angular,[0,0,i_ex[3]]) 
+    def movement(self, pid):
+        self.vel.linear.x = pid[0]
+        self.vel.linear.y = pid[1]
+        self.vel.linear.z = pid[2]
+        self.vel.angular.z = pid[3]
 
-def PID():
-    global pid
-    p = np.multiply(ex,kp)
-    i = np.multiply(i_ex,ki)
-    d = np.multiply(d_ex,kd)
-    pi = np.add(p,i)
-    pid = np.subtract(pi,d)
-    m_pid.linear = actualiza(m_pid.linear,pid)
-    m_pid.angular = actualiza(m_pid.angular,[0,0,pid[3]]) 
+class Lider(Drone):
+    def __init__(self):
+        super(Lider, self).__init__()  # Llama a super() sin argumentos
+        self.square_trajectory = generate_square_trajectory()  
+        self.current_vertex = 0  
+        self.next_vertex = 1 
 
-def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
-        vel.linear = actualiza(vel.linear,v)
-        vel.angular = actualiza(vel.angular,[0,0,v[3]])  
+    def determine_desired_pose(self, number=0):
+        # Obtiene la posicin deseada del vrtice actual en la trayectoria
+        if np.all(np.abs(self.ex) < 0.05):  # Condicin de error pequeo, ajusta este valor segn sea necesario
+            self.current_vertex = self.next_vertex
+            self.next_vertex = (self.next_vertex + 1) % len(self.square_trajectory)
+            rospy.loginfo("Moviendo hacia el vrtice")
+        else:
+            pass
+        return self.square_trajectory[self.current_vertex]
 
-def trayectoria():
-     global msgs_ref, tiempo
-     tiempo +=1
-     if tiempo == 1:
-       msgs_ref = actualiza(msgs_ref,[0,0,2])
-     elif tiempo == 2:
-        msgs_ref = actualiza(msgs_ref,[0,2,2])
-     elif tiempo == 3:
-        msgs_ref = actualiza(msgs_ref,[2,2,2])
-     elif tiempo == 3:
-        msgs_ref = actualiza(msgs_ref,[2,0,2])
-     elif tiempo == 4: 
-        msgs_ref = actualiza(msgs_ref,[0,0,2])
-     else: msgs_ref = actualiza(msgs_ref,[0,0,0])
-     print(tiempo)
+def generate_square_trajectory():
+    square_trajectory = [
+        (0, 0,2,0),  # Primer vrtice del cuadrado
+        (0, 2,2,0),  # Segundo vrtice del cuadrado
+        (2, 2,2,0),  # Tercer vrtice del cuadrado
+        (2, 0,2,0),  # Cuarto vrtice del cuadrado
+    ]
+    return square_trajectory    
 
-def cambio(ex):#checar
-    global count
-    if(np.all(np.abs(ex) < 0.05)):
-        count+=1
-    else: count = 0 
-    if(count == 10):print(ex);trayectoria()
-        
 def main_function():
-	global msgs_ref, deseadas, ex, ex0, rate       
-	msgs_ref = actualiza(msgs_ref,[0,0,0])	
-	counter = 0
-	key = ''
+    rospy.init_node("pid", anonymous=True)
+    rate = rospy.Rate(50)
 
-	rospy.init_node("pid", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
-	rate = rospy.Rate(50) #Node frequency (Hz)
-	    
-	velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10) #To publish in the topic
-	ref_pub = rospy.Publisher("/referencias", Vector3, queue_size=100)
-	error_pub = rospy.Publisher("/errores", Twist, queue_size=100)
-	derivadas = rospy.Publisher("/derivadas", Twist, queue_size=100);ex0_pub = rospy.Publisher("/ex0", Twist, queue_size=100)
-	integrales = rospy.Publisher("/integrales", Twist, queue_size=100);pid_pub = rospy.Publisher("/pid_pub", Twist,queue_size=100)
-        
-        
-	rospy.Subscriber('/ground_truth/state',Odometry, poseCallback) #To subscribe to the topic
-	rospy.Subscriber("/referencias", Vector3, refCallback, queue_size=100)	
+    lider = Lider()
 
-	enable_motors() #Execute the functions
-	while(key != 'q'):
-		error()
-		PID()
-		velocity_publisher.publish(vel) #Publish the velocities
-		ref_pub.publish(msgs_ref);ex0_pub.publish(m_ex0)
-		error_pub.publish(m_ex)
-		derivadas.publish(m_dex)
-		integrales.publish(m_iex);pid_pub.publish(m_pid);movement(pid)#;print(','.join(str(elem) for elem in cord))
-		if counter == 50: counter = 0 #Frequency divisor			
-		else:counter += 1
-		rate.sleep()
-		key = getKey(); cambio(ex)
-		# if(np.all(np.abs(ex) < 0.05)):trayectoria()
-		        
+    while not rospy.is_shutdown():
+        lider.take_off()        
+        if lider.takeoff_complete:
+            
+            deseadas_lider = lider.determine_desired_pose(0)            
+            error_lider = lider.calculate_error(deseadas_lider)
+            pl = lider.PID(kp,ki,kd,error_lider)
+            lider.movement(pl)
+
+        lider.vel_pub.publish(lider.vel)
+        rate.sleep()
+
 if __name__ == '__main__':
-    if os.name != 'nt': settings = termios.tcgetattr(sys.stdin)
-    try: main_function()  
-    except rospy.ROSInterruptException:pass
+    try:
+        main_function()
+    except rospy.ROSInterruptException:
+        pass

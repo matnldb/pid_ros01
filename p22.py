@@ -28,10 +28,10 @@ msgs_ref2 = Vector3()
 drone_path_msg2 = Path()
 enable2 = "uav2/enable_motors"
 
-# posiciones actuales(x,y,z, quaternion_yaw) y deseadas 
+
 cord1 = [0,0,0,0]
 cord2 = [0,2,0,0]
-tiempo = 0; tiempo2 = 0
+tiempo = 0
 count = 0
 fin = True
 
@@ -69,13 +69,12 @@ def actualiza(v,valor):
       return v
 
 def poseCallback(cord,drone_path_msg,msg,base):
-    global cord1, cord2, drone_path_msg1, drone_path_msg2
-    #"/uav1/base_link"
+    global cord1, cord2, drone_path_msg1, drone_path_msg2    
     pos = msg.pose.pose.position
     cord[:3] = [pos.x, pos.y, pos.z]       
     quater = msg.pose.pose.orientation
     quater_list = [quater.x, quater.y, quater.z, quater.w]
-    (r,p,cord[3]) = euler_from_quaternion(quater_list) #Euler angles are given in radians       
+    (r,p,cord[3]) = euler_from_quaternion(quater_list)        
     drone_pose = PoseStamped() #Create the PoseStamped instance
     drone_pose.pose.position = pos
     drone_path_msg.poses.append(drone_pose)
@@ -85,11 +84,11 @@ def poseCallback(cord,drone_path_msg,msg,base):
         tf.transformations.quaternion_from_euler(r,p,cord[3]), rospy.Time.now(), 
         base, global_frame )
 
-def poseCallback1(msg): #Callback function to get the drone posture
+def poseCallback1(msg): 
         global cord1, drone_path_msg1
         poseCallback(cord1,drone_path_msg1,msg,"/uav1/base_link")
 
-def poseCallback2(msg): #Callback function to get the drone posture
+def poseCallback2(msg): 
         global cord2, drone_path_msg2
         poseCallback(cord2,drone_path_msg2,msg,"/uav2/base_link")
 
@@ -112,7 +111,7 @@ def PID(kp,ki,kd, ex,ex0,i_ex):
     pid = np.subtract(pi,d)
     return pid
 
-def movement(v,vant_vel): #Function to assign control signals (Vx, Vy, Vz, Wz)
+def movement(v,vant_vel): 
         vant_vel.linear = actualiza(vant_vel.linear,v)
         vant_vel.angular = actualiza(vant_vel.angular,[0,0,v[3]])
 
@@ -146,8 +145,7 @@ def trayectoria():
      trayectoryStamped(d)
      return d
 
-def trayectoria2():
-        # global tiempo2,fin,tr_path_msg
+def trayectoria2():        
         d = [val if val == 0 else val - 0.4 for val in cord1]
         d[2:3] = cord1[2:3]
         # a = pi

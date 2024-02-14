@@ -1,20 +1,26 @@
 #!/usr/bin/env python
-import numpy as np
-import rospy
-import pyswarm as ps
+
+# Este codigo ejecuta un metodo de PSO para de forma recurrirsiva intentar 
+# determinar los mejores valores para el controlador PID a partir de lograr
+# el minimo valor en la funcion de costo.
+
+import numpy as np  # se importa la libreria para operaciones  artimeticas con vectores
+import rospy # biblioteca de ROS-python para las tareas de comunicacion
+import pyswarm as ps # proporciona una implementacion de enjambre de particulas 
+                     # para encontrar soluciones mediante la busqueda y ajuste de candidatas a lo largo de multiples iteraciones
 from hector_uav_msgs.srv import EnableMotors #rosservice info /enable_motors 
-from std_msgs.msg import Empty
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist, Vector3, Quaternion
-from tf.transformations import euler_from_quaternion
+from nav_msgs.msg import Odometry # para la captura de los mensajes de posicion y velocidad del VANT
+from geometry_msgs.msg import Twist, Vector3 # Twist>informacion sobre la velocidad lineal y angular 3D. Vector3 desribe un vector
+from tf.transformations import euler_from_quaternion #tf se utiliza para gestionar transformaciones y relaciones entre marcos de referencia.
 
 #######################################################################################
-#kbhit function implemented on Linux
+
+# funcion para manejar eventos del teclado
 import sys, select, os #Handling command line arguments
-if os.name == 'nt':
+if os.name == 'nt': # verifica si el sistema operativo es Win2
   import msvcrt
 else:
-  import tty, termios
+  import tty, termios   # se utilizan para configurar y manipular las caracteristicas de la terminal,
 
 def getKey(): #Function to use keyboard events on Linux
     if os.name == 'nt':
@@ -29,6 +35,7 @@ def getKey(): #Function to use keyboard events on Linux
 
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
+########################################################
 
 def enable_motors(): #Function to call "/enable_motors" service, needed to move the drone
     SERVICE_ENABLE_MOTORS = "enable_motors"
@@ -42,32 +49,29 @@ def enable_motors(): #Function to call "/enable_motors" service, needed to move 
         else:
             print("Enable motors failed\n")
     except rospy.ServiceException:
-    	print("Enable service", SERVICE_ENABLE_MOTORS, "call failed")
+    	print("Enable service", SERVICE_ENABLE_MOTORS, "call failed")        
 #######################################################################################
 
-# msg_takeoff, msg_land = Empty(),Empty()
 msgs_ref = Vector3()
 vel = Twist()
 velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-# posiciones actuales(x,y,z, quaternion_yaw) y deseadas 
 cord = [0,0,0,0]; i_ex = [0,0,0,0] 
-fin = True
+ciclo = True
 tiempo = 0
-count = 0
 
-def actualiza(v,valor):
+def actualiza(v,valor):  # recibe un vector3 para actualizar una variable de 3 dimensiones de ROS
       v.x = valor[0]
       v.y = valor[1]
       v.z = valor[2]
       return v
 
-def poseCallback(msg): #Callback function to get the drone posture
+def poseCallback(msg): # Recibo por parametro un mensaje tipo Twist que contiene la pose
         global cord
-        pos = msg.pose.pose.position
-        cord[:3] = [pos.x, pos.y, pos.z]       
-        quater = msg.pose.pose.orientation
+        pos = msg.pose.pose.position    # de la pose leo las coordenadas
+        cord[:3] = [pos.x, pos.y, pos.z] # asigna valores a los 3 primeros elementos de cord      
+        quater = msg.pose.pose.orientation  # de la pose leo la orientacion *(en quaterniones) 
         quater_list = [quater.x, quater.y, quater.z, quater.w]
-        (r,p,cord[3]) = euler_from_quaternion(quater_list) #Euler angles are given in radians       
+        (r,p,cord[3]) = euler_from_quaternion(quater_list) # asigno a las variables r,p,yaw(en este caso la cuarta coordenada) los valores de la transformacion de quaterniones a Euler Angles      
 
 
 def Saturacion(elemento, saturacion):
@@ -96,10 +100,9 @@ def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
         vel.angular = actualiza(vel.angular,[0,0,v[3]])  
 
 def trayectoria():
-     global tiempo,fin,i_ex
+     global tiempo,ciclo,i_ex
      i_ex = [0,0,0,0]
      tiempo +=1
-     #print(tiempo)
      if tiempo == 0:
        return [0,0,0,0]
      elif tiempo == 1:
@@ -115,26 +118,26 @@ def trayectoria():
      elif tiempo == 6: 
         return [0,0,0,0]
      else: 
-         fin = False
+         ciclo = False
          tiempo = 0
          return [0,0,0,0]     
 
-def cambio(ex):
-    global count
+def cambio(ex): # funcion para cambio de convergencia, cuando el error tiende a 0.09
     if(np.all(np.abs(ex) < 0.09)):
         return True
     else: return False
 
-def objective_function(x):
-    
-    global i_ex, velocity_publisher,fin, tiempo
-    # Coeficientes a optimizar
+def funcionObjetivo(x):
+    # recibe como parametro un arreglo que contiene en cada iteracion valores
+    # aleatorios de kp,ki,kd correspondientes a [x,y,z,yaw]
+     
+    global i_ex, velocity_publisher,ciclo, tiempo
+    # Desestructuracion de la entrada como ganancias PID
     kp = x[:4]
     ki = x[4:8]
     kd = x[8:12]
-    fin = True
-    # tiempo = 0  
-    i_ex = [0,0,0,0]
+    ciclo = True  # para indicar el fin de la iteraccion
+    i_ex = [0,0,0,0] # se le asigna un 
     J0 = 0 #error anterior
     J = 0#integral del error anterior
     deseadas = [0,0,0,0]
@@ -145,9 +148,8 @@ def objective_function(x):
     print("**********************")
     index = 0
     # Restaurar los valores iniciales de las variables
-    while(fin):
+    while(ciclo):
             ex0 = ex
-            # print("Model ", index, ex)
             index += 1
             if(cambio(ex)):
                 deseadas = trayectoria()
@@ -155,10 +157,8 @@ def objective_function(x):
             movement(PID(kp,ki,kd,ex,ex0))
             velocity_publisher.publish(vel)
             vector_traspuesto = ex.reshape(-1, 1)
-            #print(vector_traspuesto)
             escalar = np.dot(ex,vector_traspuesto)[0]
             J+= (escalar+J0)*0.005
-            #print("camino",index, "J: ", J)            
             J0 = escalar           
             rate.sleep()
     print(J)
@@ -168,11 +168,16 @@ def main_function():
         global rate	
         rospy.init_node("pid", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
         rate = rospy.Rate(50) #Node frequency (Hz
-        rospy.Subscriber('/ground_truth/state',Odometry, poseCallback) #To subscribe to the topic
+        rospy.Subscriber('/ground_truth/state',Odometry, poseCallback)
+             # crea un suscriptor que escucha el topico "/ground_truth/state" para mensajes del tipo "Odometry" y especifica que 
+             # #cuando se recibe un mensaje en ese topico, se llamar a la funcion "poseCallback" para manejar el mensaje.
+        
+        # arreglo de posibles soluciones para el iterador PSO
         inferior = [0.2, 0.2, 0.4, 1.4,0.0, 0.0, 0.0, 0,0, 0 ,0, 0]
         superior = [0.3, 0.3, 0.6, 1.6,0.05, 0.05, 0.05, 0.1,0.1, 0.1 ,0.1, 0.1]
-        enable_motors() #Execute the functions
-        xopt, fopt = ps.pso(objective_function, inferior, superior)
+
+        enable_motors() # Encender el motor
+        xopt, fopt = ps.pso(funcionObjetivo, inferior, superior) # devuelve los valores optimos y el valor al cual se converge
         # Imprimir los resultados
         print("Los mejores coeficientes encontrados:")
         print("kp =", xopt[:4])

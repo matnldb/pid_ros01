@@ -1,64 +1,48 @@
-import numpy as np
-import pyswarm
+#!/usr/bin/env python
+class Cliente(object):  # Asegrate de heredar de 'object' para usar el estilo nuevo de super()
+    def __init__(self, nombre, correo, telefono):
+        self.nombre = nombre
+        self.correo = correo
+        self.telefono = telefono
 
-deseada = 5
-ie = 0
+    def imprimir_info(self):
+        print("Nombre:", self.nombre)
+        print("Correo:", self.correo)
+        print("Telfono:", self.telefono)
 
-def pid(kp, kd, ki, e, e0):
-    global ie
-    de = (e-e0) * 100
-    ie = ie + (e + e0) * 0.005
-    pid_out = kp * e - kd * de + ki * ie
-    return pid_out
 
-# Definir la funcin objetivo para minimizar el error medio cuadrtico
-def objective_function(x):
-    global ie, deseada
-    # Coeficientes a optimizar
-    kp = x[0]
-    kd = x[1]
-    ki = x[2]
+class Persona(Cliente):
+    def __init__(self, nombre, correo, telefono, edad):
+        super(Persona, self).__init__(nombre, correo, telefono)  # Cambio aqu
+        self.edad = edad
 
-    # Restaurar los valores iniciales de las variables
-    actual = 0
-    error_acumulado = 0
-    e = deseada - actual
-    vector = [e]
-    e0 = 0    
-    ie = 0
-    
-    # Ejecutar el controlador PID y acumular el error cuadrtico
-    for _ in range(100):  
-        e = deseada - pid(kp, kd, ki, e, e0)
-        e0 = vector[-1]
-        vector.append(e) 
-        
-    for i in vector:
-        error_acumulado += (i**2)/len(vector)
-    
-    #print(x, error_acumulado)        
-    return error_acumulado
+    def imprimir_info(self):
+        super(Persona, self).imprimir_info()  # Cambio aqu
+        print("Edad:", self.edad)
 
-inferior = [0, 0, 0]
-superior = [10, 10, 20]
 
-# Ejecutar el algoritmo PSO para optimizar los coeficientes
-xopt, fopt = pyswarm.pso(objective_function, inferior, superior)
+class Empresa(Cliente):
+    def __init__(self, nombre, correo, telefono, ruc):
+        super(Empresa, self).__init__(nombre, correo, telefono)  # Cambio aqu
+        self.ruc = ruc
 
-# Imprimir los resultados
-print("Los mejores coeficientes encontrados:")
-print("kp =", xopt[0])
-print("kd =", xopt[1])
-print("ki =", xopt[2])
-print("Valor mnimo del error medio cuadrtico:", fopt)
+    def imprimir_info(self):
+        super(Empresa, self).imprimir_info()  # Cambio aqu
+        print("RUC:", self.ruc)
 
-# ex = deseada
-# ex0 = 0
-# ie = 0
-# vectorx = [deseada]
-# for _ in range(50):  
-#     ex = deseada - pid(xopt[0], xopt[1], xopt[2], ex, ex0)
-#     ex0 = vectorx[-1]
-#     vectorx.append(ex) 
 
-# print(vectorx)
+def main():
+    # Crear una instancia de Persona
+    persona = Persona("Juan", "juanexample.com", "123456789", 30)
+    print("Informacin de la Persona:")
+    persona.imprimir_info()
+    print()
+
+    # Crear una instancia de Empresa
+    empresa = Empresa("Mi Empresa", "infomiempresa.com", "987654321", "12345678901")
+    print("Informacin de la Empresa:")
+    empresa.imprimir_info()
+
+
+if __name__ == "__main__":
+    main()

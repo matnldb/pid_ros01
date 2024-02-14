@@ -90,9 +90,9 @@ def Saturacion(elemento, saturacion):
   
 def PID(kp,ki,kd, ex,ex0):
     global i_ex
-    d_ex = np.subtract(ex,ex0)*100
-    i_ex = i_ex+np.add(ex, ex0)*0.005
-    i_ex = Saturacion(i_ex, 500)
+    d_ex = np.subtract(ex,ex0)*100 #calcula la derivada del error dx=0.01
+    i_ex = i_ex+np.add(ex, ex0)*0.005 #iex por el metodo del trapecio dx = 0.01
+    i_ex = Saturacion(i_ex, 500) #limita el error por inetgracion
     p = np.multiply(ex,kp)
     i = np.multiply(i_ex,ki)
     d = np.multiply(d_ex,kd)
@@ -101,6 +101,7 @@ def PID(kp,ki,kd, ex,ex0):
     return pid
 
 def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
+        global vel
         vel.linear = actualiza(vel.linear,v)
         vel.angular = actualiza(vel.angular,[0,0,v[3]])  
 
@@ -167,7 +168,6 @@ def funcionCosto(ex):
     return J
 
 def cambio(ex):
-    global count
     if(np.all(np.abs(ex) < 0.09)):
         return True
     else: return False
@@ -176,7 +176,6 @@ def main_function():
         global msgs_ref, rate,fin,t0,tx   
         
         ex = [0,0,0,0]; 
-        #kp = [0.25, 0.25, 0.5, 1.5]; kd = [0.05, 0.05, 0.05, 0]; ki = [0, 0 ,0, 0]
         kp = [ 0.29060169,  0.22351094,  0.54439942,  1.53864866]
         ki = [ 0.0493674 ,  0.05      ,  0.0378391 ,  0.00537379]
         kd = [ 0.01099189,  0.06127233,  0.0423897 ,  0.04541789] 
