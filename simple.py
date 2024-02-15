@@ -27,3 +27,10 @@ def determine_desired_pose(self, desired_angle):
         desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
         desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
         return [desired_x, desired_y, z - 0.4, yaw]
+
+
+# Si tienes múltiples vecinos, puedes adaptar el código para manejar cada vecino por separado y luego combinar las correcciones necesarias. Aquí te dejo una idea de cómo podrías hacerlo:
+
+#     Para cada vecino, calcula la diferencia de posición y la distancia al igual que lo estás haciendo actualmente.
+#     Evalúa cada distancia y aplica la lógica de corrección según la distancia al vecino más cercano. Si estás muy cerca de cualquier vecino, ajusta tu posición para alejarte de ese vecino siguiendo la misma lógica que ya has implementado.
+#     Si estás lo suficientemente lejos de todos los vecinos, puedes proceder con la lógica actual para mantener una distancia y ángulo constante respecto al líder.

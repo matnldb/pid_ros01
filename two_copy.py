@@ -59,7 +59,7 @@ class Drone(object):
         if not self.takeoff_complete:
             # Si no se ha completado el despegue, ascender gradualmente hasta alcanzar 2 metros
             if self.cord[2] < 2:
-                self.vel.linear.z = 0.1
+                self.vel.linear.z = 0.6
             else:
                 self.vel.linear.z = 0.0
                 self.takeoff_complete = True  # Marcar el despegue como completado
@@ -113,7 +113,7 @@ def generate_square_trajectory():
 class Seguidor(Drone):
     def __init__(self, name, Lider, Vecino):
         super(Seguidor, self).__init__(name)
-        self.lider = Lider.name
+        self.lider = Lider
         self.vecino = Vecino
         self.leader_position = [0, 0, 0, 0]
         self.neighbor_position = [0, 0, 0, 0]
@@ -139,10 +139,10 @@ class Seguidor(Drone):
 
     def determine_desired_pose(self, desired_angle):
         # En el caso del seguidor, la posicin deseada depende de la posicin del lder
-        distance_guard = 2 * np.sqrt(2)
+        distance_guard = np.sqrt(2)
         corDiff = np.subtract((self.cord[:2]),(self.neighbor_position[:2]))
         distance_to_neighbor = np.linalg.norm(corDiff)                
-        if distance_to_neighbor <= distance_guard/2:
+        if distance_to_neighbor <= distance_guard:
              aux = (distance_guard - distance_to_neighbor) / distance_to_neighbor
              correction = np.multiply(corDiff,aux)
              newPose =  np.add(self.cord[:2],correction)
@@ -158,39 +158,25 @@ def main_function():
     rospy.init_node("pid", anonymous=True)
     rate = rospy.Rate(50)
 
-    lider = Lider("uav1")
-    seguidor1 = Seguidor("uav2",lider,"uav3" )
-    seguidor2 = Seguidor("uav3",lider,"uav2")    
+    angles = [0, 45, 135]
+    drones = [Lider("uav1"), Seguidor("uav2","uav1","uav3" ), Seguidor("uav3","uav1","uav2")]    
 
+    pid_outputs = []
 
     while not rospy.is_shutdown():
-        lider.take_off()
-        seguidor1.take_off()
-        seguidor2.take_off()
+        for drone in drones:
+            drone.take_off()
 
-        if lider.takeoff_complete and seguidor1.takeoff_complete:
-            
-            deseadas_lider = lider.determine_desired_pose(0)
-            deseadas_seguidor = seguidor1.determine_desired_pose(45)
-            deseadas_seguidor2= seguidor2.determine_desired_pose(135)
-            
-            error_lider = lider.calculate_error(deseadas_lider)
-            error_seguidor1 = seguidor1.calculate_error(deseadas_seguidor)
-            error_seguidor2 = seguidor2.calculate_error(deseadas_seguidor2) 
+        if all(drone.takeoff_complete for drone in drones):
+            for angle, drone in zip(angles, drones):
+                desired_pose = drone.determine_desired_pose(angle)
+                error = drone.calculate_error(desired_pose)
+                pid_output = drone.PID(kp, ki, kd, error)                
+                drone.movement(pid_output)
 
-            pl = lider.PID(kp,ki,kd,error_lider)
-            ps1 = seguidor1.PID(kp, ki,kd,error_seguidor1)
-            ps2 = seguidor2.PID(kp, ki,kd,error_seguidor2)
-            lider.movement(pl)
-            seguidor1.movement(ps1)
-            seguidor2.movement(ps2)
-
-
-        lider.vel_pub.publish(lider.vel)
-        seguidor1.vel_pub.publish(seguidor1.vel) 
-        seguidor2.vel_pub.publish(seguidor2.vel)        
-
-
+        # Publicar las velocidades de los drones
+        for drone in drones:
+            drone.vel_pub.publish(drone.vel)
         rate.sleep()
 
 if __name__ == '__main__':

@@ -135,27 +135,24 @@ class Seguidor(Drone):
         quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
         (_, _, self.neighbor_position[3]) = euler_from_quaternion(quater_list)
-
-    def PID_col(self,kpCol):
-        distance_guard = 2 * np.sqrt(2)  # Distancia de guarda
-        distance_to_neighbor = np.linalg.norm(np.array(self.cord[:2]) - np.array(self.neighbor_position[:2]))
-        self.ex0Col = self.exCol
-        self.exCol = distance_guard - distance_to_neighbor
-        print( distance_to_neighbor)
-        if distance_to_neighbor <= distance_guard/2:
-             print( "muy cerca")
-             return np.multiply(kpCol,-1*self.exCol)
-        else:
-             return np.multiply(kpCol,0)
         
 
     def determine_desired_pose(self, desired_angle):
         # En el caso del seguidor, la posicin deseada depende de la posicin del lder
-        desired_distance = 2
-        x, y, z, yaw = self.leader_position  # Utilizar la posicin del ler actualizada
-        desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
-        desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
-        return [desired_x, desired_y, z-0.4, yaw-0.4]  # Por ejemplo, mantener la misma altitud que el lder
+        distance_guard = np.sqrt(2)
+        corDiff = np.subtract((self.cord[:2]),(self.neighbor_position[:2]))
+        distance_to_neighbor = np.linalg.norm(corDiff)                
+        if distance_to_neighbor <= distance_guard:
+             aux = (distance_guard - distance_to_neighbor) / distance_to_neighbor
+             correction = np.multiply(corDiff,aux)
+             newPose =  np.add(self.cord[:2],correction)
+             return np.hstack((newPose, self.cord[2:4]))
+        else: 
+            desired_distance = 2
+            x, y, z, yaw = self.leader_position  # Utilizar la posicin del ler actualizada
+            desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
+            desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
+            return [desired_x, desired_y, z-0.4, yaw]  # Por ejemplo, mantener la misma altitud que el lder
 
 def main_function():
     rospy.init_node("pid", anonymous=True)
@@ -182,8 +179,8 @@ def main_function():
             error_seguidor2 = seguidor2.calculate_error(deseadas_seguidor2) 
 
             pl = lider.PID(kp,ki,kd,error_lider)
-            ps1 = np.add(seguidor1.PID(kp, ki,kd,error_seguidor1), seguidor1.PID_col(kpCol))
-            ps2 = np.add(seguidor2.PID(kp, ki,kd,error_seguidor2), seguidor2.PID_col(kpCol))
+            ps1 = seguidor1.PID(kp, ki,kd,error_seguidor1)
+            ps2 = seguidor2.PID(kp, ki,kd,error_seguidor2)
             lider.movement(pl)
             seguidor1.movement(ps1)
             seguidor2.movement(ps2)
