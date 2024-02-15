@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 import rospy
+import pyswarm as ps
 from hector_uav_msgs.srv import EnableMotors
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, PoseStamped

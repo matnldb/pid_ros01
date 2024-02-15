@@ -29,7 +29,7 @@ def getKey(): #Function to use keyboard events on Linux
 kp = [0.25, 0.25, 0.5, 1.5]
 kd = [0.05, 0.05, 0.05, 0]
 ki = [0, 0 ,0, 0]
-kpCol = [0.75,0.75, 0, 0]
+kpCol = [0.5, 0.5, 0, 0]
 
 class Drone(object):
     def __init__(self, name):
@@ -135,27 +135,24 @@ class Seguidor(Drone):
         quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
         (_, _, self.neighbor_position[3]) = euler_from_quaternion(quater_list)
-
-    def PID_col(self,kpCol):
-        distance_guard = 2 * np.sqrt(2)  # Distancia de guarda
-        distance_to_neighbor = np.linalg.norm(np.array(self.cord[:2]) - np.array(self.neighbor_position[:2]))
-        self.ex0Col = self.exCol
-        self.exCol = distance_guard - distance_to_neighbor
-        print( distance_to_neighbor)
-        if distance_to_neighbor <= distance_guard/2:
-             print( "muy cerca")
-             return np.multiply(kpCol,-1*self.exCol)
-        else:
-             return np.multiply(kpCol,0)
         
 
     def determine_desired_pose(self, desired_angle):
         # En el caso del seguidor, la posicin deseada depende de la posicin del lder
-        desired_distance = 2
-        x, y, z, yaw = self.leader_position  # Utilizar la posicin del ler actualizada
-        desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
-        desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
-        return [desired_x, desired_y, z-0.4, yaw-0.4]  # Por ejemplo, mantener la misma altitud que el lder
+        distance_guard = 2 * np.sqrt(2)
+        corDiff = np.subtract((self.cord[:2]),(self.neighbor_position[:2]))
+        distance_to_neighbor = np.linalg.norm(corDiff)                
+        if distance_to_neighbor <= distance_guard/2:
+             aux = (distance_guard - distance_to_neighbor) / distance_to_neighbor
+             correction = np.multiply(corDiff,aux)
+             newPose =  np.add(self.cord[:2],correction)
+             return np.hstack((newPose, self.cord[2:4]))
+        else: 
+            desired_distance = 2
+            x, y, z, yaw = self.leader_position  # Utilizar la posicin del ler actualizada
+            desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
+            desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
+            return [desired_x, desired_y, z-0.4, yaw]  # Por ejemplo, mantener la misma altitud que el lder
 
 def main_function():
     rospy.init_node("pid", anonymous=True)
@@ -163,24 +160,38 @@ def main_function():
 
     lider = Lider("uav1")
     seguidor1 = Seguidor("uav2",lider,"uav3" )
-    seguidor2 = Seguidor("uav3",lider,"uav2")
-    drones = [lider, seguidor1, seguidor2] 
-    angles = [0, 45, 135]
-    
-    while not rospy.is_shutdown():
-        for i, drone in enumerate(drones):
-            drone.take_off()
-            if drone.takeoff_complete:
-                deseadas = drone.determine_desired_pose(angles[i])
-                error = drone.calculate_error(deseadas)
-                if i == 0:
-                    pid = drone.PID(kp, ki, kd, error)
-                else:
-                    pid = np.add(drone.PID(kp, ki, kd, error), drone.PID_col(kpCol))
-                    drone.movement(pid)
-            drone.vel_pub.publish(drone.vel)
-        rate.sleep()
+    seguidor2 = Seguidor("uav3",lider,"uav2")    
 
+
+    while not rospy.is_shutdown():
+        lider.take_off()
+        seguidor1.take_off()
+        seguidor2.take_off()
+
+        if lider.takeoff_complete and seguidor1.takeoff_complete:
+            
+            deseadas_lider = lider.determine_desired_pose(0)
+            deseadas_seguidor = seguidor1.determine_desired_pose(45)
+            deseadas_seguidor2= seguidor2.determine_desired_pose(135)
+            
+            error_lider = lider.calculate_error(deseadas_lider)
+            error_seguidor1 = seguidor1.calculate_error(deseadas_seguidor)
+            error_seguidor2 = seguidor2.calculate_error(deseadas_seguidor2) 
+
+            pl = lider.PID(kp,ki,kd,error_lider)
+            ps1 = seguidor1.PID(kp, ki,kd,error_seguidor1)
+            ps2 = seguidor2.PID(kp, ki,kd,error_seguidor2)
+            lider.movement(pl)
+            seguidor1.movement(ps1)
+            seguidor2.movement(ps2)
+
+
+        lider.vel_pub.publish(lider.vel)
+        seguidor1.vel_pub.publish(seguidor1.vel) 
+        seguidor2.vel_pub.publish(seguidor2.vel)        
+
+
+        rate.sleep()
 
 if __name__ == '__main__':
     try:

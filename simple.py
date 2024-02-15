@@ -1,48 +1,29 @@
-#!/usr/bin/env python
-class Cliente(object):  # Asegrate de heredar de 'object' para usar el estilo nuevo de super()
-    def __init__(self, nombre, correo, telefono):
-        self.nombre = nombre
-        self.correo = correo
-        self.telefono = telefono
-
-    def imprimir_info(self):
-        print("Nombre:", self.nombre)
-        print("Correo:", self.correo)
-        print("Telfono:", self.telefono)
-
-
-class Persona(Cliente):
-    def __init__(self, nombre, correo, telefono, edad):
-        super(Persona, self).__init__(nombre, correo, telefono)  # Cambio aqu
-        self.edad = edad
-
-    def imprimir_info(self):
-        super(Persona, self).imprimir_info()  # Cambio aqu
-        print("Edad:", self.edad)
-
-
-class Empresa(Cliente):
-    def __init__(self, nombre, correo, telefono, ruc):
-        super(Empresa, self).__init__(nombre, correo, telefono)  # Cambio aqu
-        self.ruc = ruc
-
-    def imprimir_info(self):
-        super(Empresa, self).imprimir_info()  # Cambio aqu
-        print("RUC:", self.ruc)
-
-
-def main():
-    # Crear una instancia de Persona
-    persona = Persona("Juan", "juanexample.com", "123456789", 30)
-    print("Informacin de la Persona:")
-    persona.imprimir_info()
-    print()
-
-    # Crear una instancia de Empresa
-    empresa = Empresa("Mi Empresa", "infomiempresa.com", "987654321", "12345678901")
-    print("Informacin de la Empresa:")
-    empresa.imprimir_info()
-
-
-if __name__ == "__main__":
-    main()
+def determine_desired_pose(self, desired_angle):
+    distance_guard = 2 * np.sqrt(2)
+    desired_distance = 2
+    
+    # Lista para almacenar las correcciones de cada vecino
+    corrections = []
+    
+    # Iterar sobre todos los vecinos
+    for neighbor_position in self.all_neighbor_positions:
+        corDiff = np.subtract(self.cord[:2], neighbor_position[:2])
+        distance_to_neighbor = np.linalg.norm(corDiff)
+        
+        # Aplicar la lógica de corrección según la distancia al vecino
+        if distance_to_neighbor <= distance_guard / 2:
+            aux = (distance_guard - distance_to_neighbor) / distance_to_neighbor
+            correction = np.multiply(corDiff, aux)
+            corrections.append(correction)
+    
+    # Si hay correcciones, combinarlas
+    if corrections:
+        total_correction = np.sum(corrections, axis=0)
+        new_pose = np.add(self.cord[:2], total_correction)
+        return np.hstack((new_pose, self.cord[2:4]))
+    else:
+        # Si no hay correcciones, proceder con la lógica del líder
+        x, y, z, yaw = self.leader_position
+        desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
+        desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
+        return [desired_x, desired_y, z - 0.4, yaw]
