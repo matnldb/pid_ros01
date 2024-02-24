@@ -1,26 +1,17 @@
 #!/usr/bin/env python
+import numpy as np
+import rospy
+import pyswarm as ps
+from hector_uav_msgs.srv import EnableMotors
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist, PoseStamped
+from tf.transformations import euler_from_quaternion
 
-# Este codigo ejecuta un metodo de PSO para de forma recurrirsiva intentar 
-# determinar los mejores valores para el controlador PID a partir de lograr
-# el minimo valor en la funcion de costo.
-
-import numpy as np  # se importa la libreria para operaciones  artimeticas con vectores
-import rospy # biblioteca de ROS-python para las tareas de comunicacion
-import pyswarm as ps # proporciona una implementacion de enjambre de particulas 
-                     # para encontrar soluciones mediante la busqueda y ajuste de candidatas a lo largo de multiples iteraciones
-from hector_uav_msgs.srv import EnableMotors #rosservice info /enable_motors 
-from nav_msgs.msg import Odometry # para la captura de los mensajes de posicion y velocidad del VANT
-from geometry_msgs.msg import Twist, Vector3 # Twist>informacion sobre la velocidad lineal y angular 3D. Vector3 desribe un vector
-from tf.transformations import euler_from_quaternion #tf se utiliza para gestionar transformaciones y relaciones entre marcos de referencia.
-
-#######################################################################################
-
-# funcion para manejar eventos del teclado
 import sys, select, os #Handling command line arguments
-if os.name == 'nt': # verifica si el sistema operativo es Win2
+if os.name == 'nt':
   import msvcrt
 else:
-  import tty, termios   # se utilizan para configurar y manipular las caracteristicas de la terminal,
+  import tty, termios
 
 def getKey(): #Function to use keyboard events on Linux
     if os.name == 'nt':
@@ -35,157 +26,166 @@ def getKey(): #Function to use keyboard events on Linux
 
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
-########################################################
 
-def enable_motors(): #Function to call "/enable_motors" service, needed to move the drone
-    SERVICE_ENABLE_MOTORS = "enable_motors"
-    print("Waiting for service", SERVICE_ENABLE_MOTORS)
-    rospy.wait_for_service(SERVICE_ENABLE_MOTORS)
-    try:
-        enable_motors = rospy.ServiceProxy(SERVICE_ENABLE_MOTORS, EnableMotors)
-        res = enable_motors(True)
-        if res:
-            print("Enable motors successful\n")
-        else:
-            print("Enable motors failed\n")
-    except rospy.ServiceException:
-    	print("Enable service", SERVICE_ENABLE_MOTORS, "call failed")        
-#######################################################################################
+# kp = [0.25, 0.25, 0.5, 1.5]
+# kd = [0.05, 0.05, 0.05, 0]
+# ki = [0, 0 ,0, 0]
+cambio = False
 
-msgs_ref = Vector3()
-vel = Twist()
-velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-cord = [0,0,0,0]; i_ex = [0,0,0,0] 
-ciclo = True
-tiempo = 0
+class Drone(object):
+    def __init__(self):
+        self.vel = Twist()
+        self.cord = [0, 0, 0, 0]  # [x, y, z, yaw]
+        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.poseCallback)
+        self.enable_motors()  # Habilita los motores al inicializar el dron
+        self.takeoff_complete = False  # Bandera para indicar si el despegue ha sido completado
+        self.ex = [0, 0, 0, 0]
+        self.ex0 = [0, 0, 0, 0]
+        self.count = 0
+        self.mse = 0
+        self.band = 0
+        self.goDown = False
 
-def actualiza(v,valor):  # recibe un vector3 para actualizar una variable de 3 dimensiones de ROS
-      v.x = valor[0]
-      v.y = valor[1]
-      v.z = valor[2]
-      return v
-
-def poseCallback(msg): # Recibo por parametro un mensaje tipo Twist que contiene la pose
-        global cord
-        pos = msg.pose.pose.position    # de la pose leo las coordenadas
-        cord[:3] = [pos.x, pos.y, pos.z] # asigna valores a los 3 primeros elementos de cord      
-        quater = msg.pose.pose.orientation  # de la pose leo la orientacion *(en quaterniones) 
+    def poseCallback(self, msg):
+        pos = msg.pose.pose.position
+        self.cord[:3] = [pos.x, pos.y, pos.z]
+        quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
-        (r,p,cord[3]) = euler_from_quaternion(quater_list) # asigno a las variables r,p,yaw(en este caso la cuarta coordenada) los valores de la transformacion de quaterniones a Euler Angles      
+        (_, _, self.cord[3]) = euler_from_quaternion(quater_list)
 
+    def enable_motors(self):
+        rospy.wait_for_service('/enable_motors')
+        enable_motors = rospy.ServiceProxy('/enable_motors', EnableMotors)
+        enable_motors(True)
 
-def Saturacion(elemento, saturacion):
-    for i in range(4):
-        if elemento[i] > saturacion:
-            elemento[i] = saturacion
-        elif elemento[i] < -saturacion: 
-            elemento[i] = -saturacion
-    return elemento 
-  
-def PID(kp,ki,kd, ex,ex0):
-    global i_ex
-    d_ex = np.subtract(ex,ex0)*100
-    i_ex = i_ex+np.add(ex, ex0)*0.005
-    ex0 = ex
-    i_ex = Saturacion(i_ex, 500)
-    p = np.multiply(ex,kp)
-    i = np.multiply(i_ex,ki)
-    d = np.multiply(d_ex,kd)
-    pi = np.add(p,i)
-    pid = np.subtract(pi,d)
-    return pid
+    def take_off(self):
+        if not self.takeoff_complete:
+            # Si no se ha completado el despegue, ascender gradualmente hasta alcanzar 2 metros
+            if self.cord[2] < 2:
+                self.vel.linear.z = 0.2
+            else:
+                self.vel.linear.z = 0.0
+                self.takeoff_complete = True  # Marcar el despegue como completado
+        else:
+            self.vel.linear.z = 0.0  # El despegue ya ha sido completado, mantener la altitud constante
 
-def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
-        vel.linear = actualiza(vel.linear,v)
-        vel.angular = actualiza(vel.angular,[0,0,v[3]])  
+    def land(self):
+        if not self.goDown:
+            if self.cord[2] > 0.3:
+                self.vel.linear.z = -0.2  # Descender gradualmente
+            else:
+                self.vel.linear.z = 0.0
+                self.goDown = True  # El aterrizaje ha sido completado
+        else: 
+            self.vel.linear.z = 0.0
 
-def trayectoria():
-     global tiempo,ciclo,i_ex
-     i_ex = [0,0,0,0]
-     tiempo +=1
-     if tiempo == 0:
-       return [0,0,0,0]
-     elif tiempo == 1:
-       return [0,0,2,0]
-     elif tiempo == 2:
-        return [0,2,2,0]
-     elif tiempo == 3:
-        return [2,2,2,0]
-     elif tiempo == 4:
-        return [2,0,2,0]
-     elif tiempo == 5: 
-        return [0,0,2,0]
-     elif tiempo == 6: 
-        return [0,0,0,0]
-     else: 
-         ciclo = False
-         tiempo = 0
-         return [0,0,0,0]     
+    def calculate_error(self, desired_position):
+        self.ex0 = self.ex
+        self.ex = np.subtract(desired_position, self.cord)
+        return self.ex
+    
+    def calcula_MSE(self, error):
+        self.mse += np.sum(np.square(error))
+        self.count +=1 
 
-def cambio(ex): # funcion para cambio de convergencia, cuando el error tiende a 0.09
-    if(np.all(np.abs(ex) < 0.09)):
-        return True
-    else: return False
+    def reset(self):        
+        global cambio
+        cambio = False
+        self.mse = 0
+        self.count = 0
 
-def funcionObjetivo(x):
-    # recibe como parametro un arreglo que contiene en cada iteracion valores
-    # aleatorios de kp,ki,kd correspondientes a [x,y,z,yaw]
-     
-    global i_ex, velocity_publisher,ciclo, tiempo
-    # Desestructuracion de la entrada como ganancias PID
-    kp = x[:4]
-    ki = x[4:8]
-    kd = x[8:12]
-    ciclo = True  # para indicar el fin de la iteraccion
-    i_ex = [0,0,0,0] # se le asigna un 
-    J0 = 0 #error anterior
-    J = 0#integral del error anterior
-    deseadas = [0,0,0,0]
-    ex = [0,0,0,0]
-    print("kp: ",kp)
-    print("ki: ",ki)
-    print("kd: ",kd)
-    print("**********************")
-    index = 0
-    # Restaurar los valores iniciales de las variables
-    while(ciclo):
-            ex0 = ex
-            index += 1
-            if(cambio(ex)):
-                deseadas = trayectoria()
-            ex = np.subtract(deseadas,cord)		
-            movement(PID(kp,ki,kd,ex,ex0))
-            velocity_publisher.publish(vel)
-            vector_traspuesto = ex.reshape(-1, 1)
-            escalar = np.dot(ex,vector_traspuesto)[0]
-            J+= (escalar+J0)*0.005
-            J0 = escalar           
-            rate.sleep()
-    print(J)
-    return J     	
-        
-def main_function():
-        global rate	
-        rospy.init_node("pid", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
-        rate = rospy.Rate(50) #Node frequency (Hz
-        rospy.Subscriber('/ground_truth/state',Odometry, poseCallback)
-             # crea un suscriptor que escucha el topico "/ground_truth/state" para mensajes del tipo "Odometry" y especifica que 
-             # #cuando se recibe un mensaje en ese topico, se llamar a la funcion "poseCallback" para manejar el mensaje.
-        
-        # arreglo de posibles soluciones para el iterador PSO
-        inferior = [0.2, 0.2, 0.4, 1.4,0.0, 0.0, 0.0, 0,0, 0 ,0, 0]
-        superior = [0.3, 0.3, 0.6, 1.6,0.05, 0.05, 0.05, 0.1,0.1, 0.1 ,0.1, 0.1]
+    def PID(self, kp, kd, error):
+        d_ex = np.subtract(error, self.ex0) * 100
+        p = np.multiply(error, kp)
+        d = np.multiply(d_ex, kd)
+        pid = np.add(p, d)
+        return pid
 
-        enable_motors() # Encender el motor
-        xopt, fopt = ps.pso(funcionObjetivo, inferior, superior) # devuelve los valores optimos y el valor al cual se converge
-        # Imprimir los resultados
-        print("Los mejores coeficientes encontrados:")
-        print("kp =", xopt[:4])
-        print("kd =", xopt[4:8])
-        print("ki =", xopt[8:12])
-        print("Valor mnimo del error medio cuadrtico:", fopt)         		
-		        
+    def movement(self, pid):
+        self.vel.linear.x = pid[0]
+        self.vel.linear.y = pid[1]
+        self.vel.linear.z = pid[2]
+        self.vel.angular.z = pid[3]
+
+class Lider(Drone):
+    def __init__(self):
+        super(Lider, self).__init__()  # Llama a super() sin argumentos
+        self.square_trajectory = generate_square_trajectory()  
+        self.current_vertex = 0  
+        self.next_vertex = 1
+        self.MSE2 = 0
+        self.cuenta = 0
+
+    def determine_desired_pose(self, desired_angle=0):
+        global cambio
+        # Obtiene la posicin deseada del vrtice actual en la trayectoria        
+        if np.all(np.abs(self.ex) < 0.25):  # Condicin de error pequeo, ajusta este valor segn sea necesario                             
+            if self.band != 0:
+                cambio = True
+            self.band +=1
+            self.current_vertex = self.next_vertex
+            self.next_vertex = (self.next_vertex + 1) % len(self.square_trajectory)
+        else:
+            pass
+        return self.square_trajectory[self.current_vertex]
+
+def generate_square_trajectory():
+    square_trajectory = [
+        (0, 0,2,0),  # Primer vrtice del cuadrado
+        (0, 2,2,0),  # Segundo vrtice del cuadrado
+        (2, 2,2,0),  # Tercer vrtice del cuadrado
+        (2, 0,2,0),  # Cuarto vrtice del cuadrado
+    ]
+    return square_trajectory   
+
+def funcionObjetivo(gains):
+    global cambio
+    kp = gains[:4]
+    kd = gains[4:]
+    print("kp: ", kp)
+    print("kd: ", kd)
+    lado = 0
+    MSE2 = 0    
+    rospy.init_node("pid", anonymous=True)
+    rate = rospy.Rate(50)
+    lider = Lider()
+    while not rospy.is_shutdown():
+        lider.take_off()        
+        if lider.takeoff_complete:
+            
+            deseadas_lider = lider.determine_desired_pose(0)
+            error_lider = lider.calculate_error(deseadas_lider)
+            lider.calcula_MSE(error_lider)
+            pl = lider.PID(kp,kd,error_lider)
+            lider.movement(pl)
+            if lado < 4: 
+                if cambio:
+                    MSE2 += lider.mse/lider.count
+                    lado+=1
+                    lider.reset()
+            else:
+                lider.land()
+                if lider.goDown:
+                   print("MSE: ", MSE2/4)
+                   return MSE2/4         
+        lider.vel_pub.publish(lider.vel)        
+        rate.sleep()
+    return lider.MSE2/4
+
+def main_function(): 
+    inferior = [0, 0, 0, 0, 0, 0, 0, 0]
+    superior = [2, 2, 2, 2, 2, 2, 2, 2]  
+    
+    xopt, fopt = ps.pso(funcionObjetivo, inferior, superior) #swarmsize=5, maxiter=3
+    # Imprimir los resultados
+    print("Los mejores coeficientes encontrados:")
+    print("kp =", xopt[:4])
+    print("kd =", xopt[4:8])
+    print("Valor mnimo del error medio cuadrtico:", fopt) 
+
 if __name__ == '__main__':
-    if os.name != 'nt': settings = termios.tcgetattr(sys.stdin)
-    try: main_function()  
-    except rospy.ROSInterruptException:pass
+    try:
+        main_function()
+    except rospy.ROSInterruptException:
+        pass

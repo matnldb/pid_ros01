@@ -1,66 +1,31 @@
-# import numpy as np
-# import pyswarm
-
-# deseada = 5
-# actual = 0
-# error_acumulado = 0
-
-# def pid(kp, kd,ki,e,e0,ie):
-    
-#     de = np.subtract(e, e0) * 100
-#     ie = ie+np.add(e, e0)*0.005
-#     pid_out = kp * e + kd * de + ki*ie
-#     return pid_out
-     
-
-# # Definir la funcin objetivo para minimizar el error medio cuadrtico
-# def objective_function(x):
-    
-#     # Coeficientes a optimizar
-#     kp = x[0]
-#     kd = x[1]
-#     ki = x[2]
-    
-#     # Restaurar los valores iniciales de las variables
-#     actual = 0
-#     error_acumulado = 0
-#     e = deseada - actual
-#     vector = [e]
-#     e0 = 0    
-#     ie = 0
-    
-#     # Ejecutar el controlador PID y acumular el error cuadrtico
-#     for _ in range(100):  
-#         e = deseada - pid(kp, kd,ki,e,e0,ie)
-#         e0 = e
-#         vector.append(e)
-#         error_acumulado += e**2
-#         if e == 0:
-#             contador +=1
-#         else: contador = 0
-#         if contador == 5:
-#             break
-    
-#     # Calcular el error medio cuadrtico
-#     mse = error_acumulado / (len(vector)-1)    
-#     return mse
-
-# inferior = [0, 0, 0]
-# superior = [10,10,20]
-
-# # Ejecutar el algoritmo PSO para optimizar los coeficientes
-# xopt, fopt = pyswarm.pso(objective_function, inferior, superior)
-
-# # Imprimir los resultados
-# print("Los mejores coeficientes encontrados:")
-# print("kp =", xopt[0])
-# print("kd =", xopt[1])
-# print("ki =", xopt[2])
-# print("Valor mnimo del error medio cuadrtico:", fopt)
+#!/usr/bin/env python
 import numpy as np
-a = [1,2,3,4]
-b= [3,5]
 
-c = np.add(a[:2],b)
-d = np.hstack((c, a[2:4]))
-print(len(d))
+# errors_x = np.linspace(0.5, 0, 20)  # Error en la coordenada x
+# errors_y = np.linspace(0.3, 0, 20)  # Error en la coordenada y
+# errors_z = np.linspace(0.2, 0, 20)  # Error en la coordenada z
+# errors_yaw = np.linspace(0.1, 0, 20)  # Error en la coordenada yaw
+# print(errors_x)
+
+# squared_errors_x = errors_x ** 2
+# squared_errors_y = errors_y ** 2
+# squared_errors_z = errors_z ** 2
+# squared_errors_yaw = errors_yaw ** 2
+# print(squared_errors_x)
+
+# sum_squared_errors_x = np.sum(squared_errors_x)
+# sum_squared_errors_y = np.sum(squared_errors_y)
+# sum_squared_errors_z = np.sum(squared_errors_z)
+# sum_squared_errors_yaw = np.sum(squared_errors_yaw)
+# print("sumados:",sum_squared_errors_x)
+
+# mean_squared_error_x = sum_squared_errors_x / len(errors_x)
+# mean_squared_error_y = sum_squared_errors_y / len(errors_y)
+# mean_squared_error_z = sum_squared_errors_z / len(errors_z)
+# mean_squared_error_yaw = sum_squared_errors_yaw / len(errors_yaw)
+
+# # Finalmente, tomamos el promedio de estos promedios para obtener el MSE para todo el tramo AB
+# MSE = (mean_squared_error_x + mean_squared_error_y + mean_squared_error_z + mean_squared_error_yaw) / 4
+
+# print("MSE para el tramo AB:", MSE)
+

@@ -96,7 +96,6 @@ class Lider(Drone):
         if np.all(np.abs(self.ex) < 0.05):  # Condicin de error pequeo, ajusta este valor segn sea necesario
             self.current_vertex = self.next_vertex
             self.next_vertex = (self.next_vertex + 1) % len(self.square_trajectory)
-            rospy.loginfo("Moviendo hacia el vrtice")
         else:
             pass
         return self.square_trajectory[self.current_vertex]

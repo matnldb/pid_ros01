@@ -40,3 +40,66 @@ Posteriormente, la distancia al vecino se calcula utilizando la norma euclidiana
 Luego, se aplica una condición para verificar si la distancia al vecino es menor o igual a la mitad de la distancia de guardia. Esta condición se deriva del principio de seguridad y prevención de colisiones, que establece que la distancia entre los drones debe ser suficientemente grande para evitar colisiones. Si la distancia es menor o igual a la mitad de la distancia de guardia, se considera que los drones están demasiado cerca y se requiere una corrección.
 
 Finalmente, se calcula la corrección de posición utilizando un enfoque de control proporcional. Esta técnica ajusta la posición del dron en función de la diferencia entre la distancia de guardia y la distancia real al vecino. La corrección se calcula como un vector que apunta en la dirección opuesta al vecino y tiene una magnitud proporcional a la diferencia de distancias. Este enfoque se basa en la Ley del Inverso del Cuadrado, que establece que la intensidad de una magnitud es inversamente proporcional al cuadrado de la distancia entre los objetos.
+
+
+**********************************************************
+
+El error cuadrático medio (MSE, por sus siglas en inglés Mean Squared Error) es una medida comúnmente utilizada para evaluar la precisión de un predictor o estimador en comparación con los valores reales. Se calcula como la media de los cuadrados de las diferencias entre los valores predichos y los valores reales.
+
+Matemáticamente, el MSE se define como:
+
+MSE=1n∑i=1n(yi−y^i)2MSE=n1​∑i=1n​(yi​−y^​i​)2
+
+Donde:
+
+    nn es el número de muestras.
+    yiyi​ es el valor real de la muestra ii.
+    y^iy^​i​ es el valor predicho para la muestra ii.
+
+El MSE penaliza de manera cuadrática las diferencias entre los valores predichos y los valores reales. Esto significa que los errores grandes contribuyen significativamente más al MSE que los errores pequeños. Por lo tanto, minimizar el MSE implica minimizar la magnitud de los errores y, en consecuencia, mejorar la precisión del predictor o estimador.
+
+En el contexto del código que hemos discutido, estamos utilizando el MSE como función objetivo en el algoritmo de PSO para ajustar las ganancias del controlador PID. Queremos minimizar el MSE para mejorar la precisión del controlador y lograr un seguimiento más preciso de la trayectoria deseada del dron.
+*******************************************************
+
+Para calcular el error cuadrático medio (MSE) en el movimiento de un dron desde un punto A a un punto B en un espacio tridimensional, consideraremos el error en las coordenadas xx, yy, zz y el ángulo de orientación yawyaw. Denotemos los valores reales como (xr,yr,zr,yawr)(xr​,yr​,zr​,yawr​) y los valores deseados o predichos como (xd,yd,zd,yawd)(xd​,yd​,zd​,yawd​).
+
+El error en cada dimensión se calcula como la diferencia entre el valor real y el valor deseado/predicho:
+
+ex=xr−xdex​=xr​−xd​
+ey=yr−ydey​=yr​−yd​
+ez=zr−zdez​=zr​−zd​
+eyaw=yawr−yawdeyaw​=yawr​−yawd​
+
+El error cuadrático medio (MSE) se calcula tomando el promedio de los cuadrados de estos errores:
+
+MSE=1n∑i=1n(ei)2MSE=n1​∑i=1n​(ei​)2
+
+Donde nn es el número total de muestras o el número de dimensiones (en este caso, 4: xx, yy, zz y yawyaw).
+
+Entonces, en resumen, el error cuadrático medio en el movimiento del dron desde el punto A al punto B se calcula como la media de los cuadrados de las diferencias entre las coordenadas y el ángulo de orientación reales y deseados/predichos. Esto proporciona una medida cuantitativa de la precisión del controlador PID en el seguimiento de la trayectoria deseada.
+
+Si deseas describir una trayectoria en forma de cuadrado, el enfoque más común sería dividir la trayectoria en varios segmentos y calcular el error cuadrático medio (MSE) para cada segmento individual. En el caso del cuadrado, tienes cuatro segmentos: AB, BC, CD y DA.
+
+Entonces, para calcular el MSE en la trayectoria del cuadrado, seguirías estos pasos:
+
+    Divide la trayectoria del cuadrado en segmentos AB, BC, CD y DA.
+    Para cada segmento, calcula el error en las coordenadas xx, yy, zz y el ángulo de orientación yawyaw.
+    Calcula el MSE para cada segmento individual utilizando la fórmula del MSE que discutimos anteriormente.
+    Finalmente, puedes tomar el promedio de los MSE de todos los segmentos para obtener una medida global de la precisión del seguimiento de la trayectoria.
+
+Este enfoque te permite evaluar la precisión del controlador PID en cada segmento de la trayectoria del cuadrado, lo que puede ser útil para identificar áreas donde se necesita ajuste o mejora en el controlador.
+
+*********************************************************************************
+Sí, exactamente. En este caso, tu función objetivo sería minimizar el error cuadrático medio (MSE) promedio de todos los segmentos de la trayectoria del cuadrado. Por lo tanto, tu función objetivo sería el promedio de los MSE calculados para cada segmento individual.
+
+Para utilizar PSO (Optimización por Enjambre de Partículas) en este escenario, seguirías estos pasos:
+
+    Define una función de evaluación que calcule el MSE para cada segmento de la trayectoria del cuadrado y luego devuelva el promedio de estos MSE.
+    Define los límites superiores e inferiores para las ganancias kpkp, kiki y kdkd del controlador PID.
+    Define el número de partículas y el número de iteraciones para el algoritmo PSO.
+    Utiliza PSO para buscar las ganancias kpkp, kiki y kdkd que minimicen el MSE promedio.
+    Después de que PSO haya convergido, las ganancias encontradas pueden utilizarse como los parámetros del controlador PID para la trayectoria del cuadrado.
+
+Al minimizar el MSE promedio utilizando PSO, estás buscando las ganancias que permiten al controlador PID seguir la trayectoria del cuadrado con la menor cantidad de error posible en general. Esto te ayudará a ajustar las ganancias del controlador para lograr un mejor rendimiento en el seguimiento de la trayectoria.
+
+******************************************************************************

@@ -2,13 +2,11 @@
 import numpy as np
 import rospy
 import pyswarm as ps
-from hector_uav_msgs.srv import EnableMotors #rosservice info /enable_motors 
-from nav_msgs.msg import Odometry, Path
-from geometry_msgs.msg import Twist, Vector3, PoseStamped
+from hector_uav_msgs.srv import EnableMotors
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist, PoseStamped
 from tf.transformations import euler_from_quaternion
 
-#######################################################################################
-#kbhit function implemented on Linux
 import sys, select, os #Handling command line arguments
 if os.name == 'nt':
   import msvcrt
@@ -29,186 +27,125 @@ def getKey(): #Function to use keyboard events on Linux
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
-def enable_motors(): #Function to call "/enable_motors" service, needed to move the drone
-    SERVICE_ENABLE_MOTORS = "enable_motors"
-    print("Waiting for service", SERVICE_ENABLE_MOTORS)
-    rospy.wait_for_service(SERVICE_ENABLE_MOTORS)
-    try:
-        enable_motors = rospy.ServiceProxy(SERVICE_ENABLE_MOTORS, EnableMotors)
-        res = enable_motors(True)
-        if res:
-            print("Enable motors successful\n")
-        else:
-            print("Enable motors failed\n")
-    except rospy.ServiceException:
-    	print("Enable service", SERVICE_ENABLE_MOTORS, "call failed")
-#######################################################################################
+kp = [0.25, 0.25, 0.5, 1.5]
+kd = [0.05, 0.05, 0.05, 0]
+ki = [0, 0 ,0, 0]
 
-msgs_ref = Vector3()
-vel = Twist()
-drone_path_msg = Path()
-tr_path_msg = Path()
-global_frame = "/world"
-# posiciones actuales(x,y,z, quaternion_yaw) y deseadas 
-cord = [0,0,0,0]; i_ex = [0,0,0,0]; 
-tiempo = 0
-count = 0
-t0 = 0.0
-t = 0.0
-J0 = 0 #error anterior
-J = 0
-tx = 0
-cordx = [0,0,0]
-fin = True
-velocidades = []
+class Drone(object):
+    def __init__(self):
+        self.vel = Twist()
+        self.cord = [0, 0, 0, 0]  # [x, y, z, yaw]
+        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.poseCallback)
+        self.enable_motors()  # Habilita los motores al inicializar el dron
+        self.takeoff_complete = False  # Bandera para indicar si el despegue ha sido completado
+        self.ex = [0, 0, 0, 0]
+        self.ex0 = [0, 0, 0, 0]
+        self.cuadratico = [0, 0, 0, 0]  # Arreglo para guardar el MSE de cada tramo
+        self.count = 0
 
-def actualiza(v,valor):
-      v.x = valor[0]
-      v.y = valor[1]
-      v.z = valor[2]
-      return v
-
-def poseCallback(msg): #Callback function to get the drone posture
-        global cord, drone_path_msg
+    def poseCallback(self, msg):
         pos = msg.pose.pose.position
-        cord[:3] = [pos.x, pos.y, pos.z]       
+        self.cord[:3] = [pos.x, pos.y, pos.z]
         quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
-        (r,p,cord[3]) = euler_from_quaternion(quater_list) #Euler angles are given in radians       
-        velocidad()
-        drone_pose = PoseStamped() #Create the PoseStamped instance
-        drone_pose.pose.position = msg.pose.pose.position
-        drone_path_msg.poses.append(drone_pose) #Add the drone position to the list of points
+        (_, _, self.cord[3]) = euler_from_quaternion(quater_list)
 
-def Saturacion(elemento, saturacion):
-    for i in range(4):
-        if elemento[i] > saturacion:
-            elemento[i] = saturacion
-        elif elemento[i] < -saturacion: 
-            elemento[i] = -saturacion
-    return elemento 
-  
-def PID(kp,ki,kd, ex,ex0):
-    global i_ex
-    d_ex = np.subtract(ex,ex0)*100 #calcula la derivada del error dx=0.01
-    i_ex = i_ex+np.add(ex, ex0)*0.005 #iex por el metodo del trapecio dx = 0.01
-    i_ex = Saturacion(i_ex, 500) #limita el error por inetgracion
-    p = np.multiply(ex,kp)
-    i = np.multiply(i_ex,ki)
-    d = np.multiply(d_ex,kd)
-    pi = np.add(p,i)
-    pid = np.subtract(pi,d)
-    return pid
+    def enable_motors(self):
+        rospy.wait_for_service('/enable_motors')
+        enable_motors = rospy.ServiceProxy('/enable_motors', EnableMotors)
+        enable_motors(True)
 
-def movement(v): #Function to assign control signals (Vx, Vy, Vz, Wz)
-        global vel
-        vel.linear = actualiza(vel.linear,v)
-        vel.angular = actualiza(vel.angular,[0,0,v[3]])  
+    def take_off(self):
+        if not self.takeoff_complete:
+            # Si no se ha completado el despegue, ascender gradualmente hasta alcanzar 2 metros
+            if self.cord[2] < 2:
+                self.vel.linear.z = 0.25
+            else:
+                self.vel.linear.z = 0.0
+                self.takeoff_complete = True  # Marcar el despegue como completado
+        else:
+            self.vel.linear.z = 0.0  # El despegue ya ha sido completado, mantener la altitud constante
+    
+    def calculate_error(self, desired_position):
+        self.ex0 = self.ex
+        self.ex = np.subtract(desired_position, self.cord)
+        self.cuadratico = np.add(self.cuadratico, np.square(self.ex))
+        self.count +=1
+        return self.ex
 
-def trayectoria():
-     global tiempo,fin,tr_path_msg,i_ex,t,t0
-     tiempo +=1
-     i_ex = [0,0,0,0]    
-     t1 = rospy.Time.now().to_sec() - t0
-     t0 = t1
-     t += t1
-     #if tiempo <6: print(t1)
-     if tiempo == 1: 
-       print("--:tiempo 1",t1)  
-       d = [0,0,2,0]
-     elif tiempo == 2:
-        print("--:tiempo 2",t1) 
-        d =  [0,2,2,0]
-     elif tiempo == 3:
-       print("--:tiempo 3",t1) 
-       d =  [2,2,2,0]
-     elif tiempo == 4:
-        print("--:tiempo 4",t1) 
-        d =  [2,0,2,0]
-     elif tiempo == 5: 
-        print("--:tiempo 5",t1) 
-        d =  [0,0,2,0]
-     elif tiempo == 6: 
-        print("--:tiempo 6",t1) 
-        d =  [0,0,0,0]
-     else: 
-         print("--:tiempo total")         
-         print(t) 
-         print("la velocidad mayor fue")
-         print(max(velocidades))                 
-         fin = False
-         d = [0,0,0,0]
-     print("El error cuadratico medio se calculo: ")
-     print(J)       
-     t1 = 0
-     tr_pose = PoseStamped() #Create the PoseStamped instance
-     tr_pose.pose.position = actualiza(tr_pose.pose.position,d)     
-     tr_path_msg.poses.append(tr_pose) #Add the new point to the list
-     return d     
+    def PID(self, kp, ki, kd, error):
+        d_ex = np.subtract(error, self.ex0) * 100
+        p = np.multiply(error, kp)
+        d = np.multiply(d_ex, kd)
+        pid = np.add(p, d)
+        return pid
 
-def velocidad():
-    global tx, cordx, velocidades
-    tx2 = rospy.Time.now().to_sec() 
-    dtx = tx2 - tx
-    tx = tx2
-    a = np.array(cord[:3])
-    b = np.array(cordx)
-    d = np.linalg.norm(a - b)    
-    cordx = cord[:3]
-    if dtx!= 0:
-        v = d/dtx
-        velocidades.append(v)    
+    def movement(self, pid):
+        self.vel.linear.x = pid[0]
+        self.vel.linear.y = pid[1]
+        self.vel.linear.z = pid[2]
+        self.vel.angular.z = pid[3]
 
-def funcionCosto(ex):
-    global J, J0   
-    vector_traspuesto = ex.reshape(-1, 1)
-    escalar = np.dot(ex,vector_traspuesto)[0]
-    J+= (escalar+J0)*0.005            
-    J0 = escalar
-    return J
+class Lider(Drone):
+    def __init__(self):
+        super(Lider, self).__init__()  # Llama a super() sin argumentos
+        self.square_trajectory = generate_square_trajectory()  
+        self.current_vertex = 0  
+        self.next_vertex = 1
+        self.MSE2 = 0
+        self.cuenta = 0              
+ 
 
-def cambio(ex):
-    if(np.all(np.abs(ex) < 0.09)):
-        return True
-    else: return False
-        
+    def determine_desired_pose(self, number=0):
+        # Obtiene la posicin deseada del vrtice actual en la trayectoria        
+        if np.all(np.abs(self.ex) < 0.05):  # Condicin de error pequeo, ajusta este valor segn sea necesario
+            if self.count != 0:
+                MSE1 = np.sum(self.cuadratico/self.count)                
+                print("MSE: ",MSE1) 
+                self.cuadratico = [0, 0, 0, 0]
+                self.count = 0
+                self.MSE2 = np.add(self.MSE2,MSE1)
+                self.cuenta +=1
+                if(self.cuenta == 4):
+                    print(self.MSE2/4)
+                    self.MSE2 = 0
+                    self.cuenta = 0                     
+            self.current_vertex = self.next_vertex
+            self.next_vertex = (self.next_vertex + 1) % len(self.square_trajectory)
+        else:
+            pass
+        return self.square_trajectory[self.current_vertex]
+
+def generate_square_trajectory():
+    square_trajectory = [
+        (0, 0,2,0),  # Primer vrtice del cuadrado
+        (0, 2,2,0),  # Segundo vrtice del cuadrado
+        (2, 2,2,0),  # Tercer vrtice del cuadrado
+        (2, 0,2,0),  # Cuarto vrtice del cuadrado
+    ]
+    return square_trajectory    
+
 def main_function():
-        global msgs_ref, rate,fin,t0,tx   
-        
-        ex = [0,0,0,0]; 
-        kp = [ 0.29060169,  0.22351094,  0.54439942,  1.53864866]
-        ki = [ 0.0493674 ,  0.05      ,  0.0378391 ,  0.00537379]
-        kd = [ 0.01099189,  0.06127233,  0.0423897 ,  0.04541789] 
-        deseadas = [0,0,0,0]
-        rospy.init_node("pid", anonymous=True) #Initialize the node. anonymous=True for multiple nodes
-        rate = rospy.Rate(50) #Node frequency (Hz)
-        tx = rospy.Time.now().to_sec()
-            
-        velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)         
-        rospy.Subscriber('/ground_truth/state',Odometry, poseCallback) #To subscribe to the topic
-        
-        #To publish the paths
-        drone_path_pub = rospy.Publisher('/path', Path, queue_size=10)
-        tr_path_pub = rospy.Publisher('/tr_path', Path, queue_size=10) 
-        
-        global drone_path_msg, tr_path_msg
-        # #Important: Assignation of the SAME reference frame for ALL robots
-        drone_path_msg.header.frame_id = tr_path_msg.header.frame_id = global_frame
+    rospy.init_node("pid", anonymous=True)
+    rate = rospy.Rate(50)
 
-        enable_motors() #Execute the functions
-        t0 = rospy.Time.now().to_sec()
-        while(fin):
-                ex0 = ex            
-                if(cambio(ex)):                    
-                    deseadas = trayectoria()
-                ex = np.subtract(deseadas,cord)
-                funcionCosto(ex)		
-                movement(PID(kp,ki,kd,ex,ex0))
-                velocity_publisher.publish(vel)
-                drone_path_pub.publish(drone_path_msg); tr_path_pub.publish(tr_path_msg) 
-                rate.sleep()            		
-		        
+    lider = Lider()
+
+    while not rospy.is_shutdown():
+        lider.take_off()        
+        if lider.takeoff_complete:
+            
+            deseadas_lider = lider.determine_desired_pose(0)            
+            error_lider = lider.calculate_error(deseadas_lider)
+            pl = lider.PID(kp,ki,kd,error_lider)
+            lider.movement(pl)
+
+        lider.vel_pub.publish(lider.vel)
+        rate.sleep()
+
 if __name__ == '__main__':
-    if os.name != 'nt': settings = termios.tcgetattr(sys.stdin)
-    try: main_function()  
-    except rospy.ROSInterruptException:pass
+    try:
+        main_function()
+    except rospy.ROSInterruptException:
+        pass
