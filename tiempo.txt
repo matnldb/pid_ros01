@@ -1,17 +1,27 @@
-El algoritmo de control diseñado para evitar colisiones entre drones se basa en la aplicación de principios fundamentales de la física y la teoría de control. En primer lugar, al considerar la posición relativa entre el dron actual y su vecino más cercano, se utiliza la diferencia vectorial entre sus posiciones para determinar la dirección de la corrección necesaria. Esto se refleja en la fórmula de corrección, donde se resta el vector posición del vecino al vector posición del dron actual.
+ El algoritmo de control diseñado para evitar colisiones entre drones se basa en la aplicación de principios fundamentales de la física y la teoría
+de control. En primer lugar, al considerar la posición relativa entre el dron actual y su vecino más cercano, se utiliza la diferencia vectorial
+entre sus posiciones para determinar la dirección de la corrección necesaria. Esto se refleja en la fórmula de corrección, donde se resta 
+el vector posición del vecino al vector posición del dron actual.
 
-corDiff=pos_self−pos_neighcorDiff=pos_self−pos_neigh
+    corDiff=pos_self−pos_neighcorDiff=pos_self−pos_neigh
 
-Posteriormente, se calcula la distancia euclidiana entre ambos drones para cuantificar la magnitud de la corrección necesaria. La distancia entre los drones es esencial para determinar el nivel de ajuste requerido para mantener una distancia segura. En este punto, se hace uso de la norma Euclidiana para calcular la distancia entre los puntos.
+Posteriormente, se calcula la distancia euclidiana entre ambos drones para cuantificar la magnitud de la corrección necesaria. La distancia entre
+los drones es esencial para determinar el nivel de ajuste requerido para mantener una distancia segura. En este punto, se hace uso de la norma 
+Euclidiana para calcular la distancia entre los puntos.
 
-distance_to_neighbor=∥corDiff∥distance_to_neighbor=∥corDiff∥
+    distance_to_neighbor=∥corDiff∥distance_to_neighbor=∥corDiff∥
 
-La corrección se calcula entonces proporcionalmente a la diferencia entre la distancia de seguridad deseada y la distancia real al vecino. Esta diferencia se normaliza para ajustar la magnitud de la corrección de manera proporcional a la distancia actual. Este proceso se basa en la ley de conservación de la energía y la mecánica newtoniana, donde la fuerza correctiva aplicada es directamente proporcional a la discrepancia entre la posición deseada y la real.
+La corrección se calcula entonces proporcionalmente a la diferencia entre la distancia de seguridad deseada y la distancia real al vecino. Esta 
+diferencia se normaliza para ajustar la magnitud de la corrección de manera proporcional a la distancia actual. Este proceso se basa en la ley de 
+conservación de la energía y la mecánica newtoniana, donde la fuerza correctiva aplicada es directamente proporcional a la discrepancia entre la
+posición deseada y la real.
 
-aux=safety_distance−distance_to_neighbordistance_to_neighboraux=distance_to_neighborsafety_distance−distance_to_neighbor​
-correction=corDiff×auxcorrection=corDiff×aux
+    aux=safety_distance−distance_to_neighbordistance_to_neighboraux=distance_to_neighborsafety_distance−distance_to_neighbor​
+    correction=corDiff×auxcorrection=corDiff×aux
 
-Finalmente, la nueva pose deseada se calcula sumando la corrección a la posición actual del dron. Este proceso asegura que el dron ajuste su posición de manera apropiada para evitar colisiones con su vecino más cercano mientras mantiene una trayectoria deseada. Esta metodología ha sido validada mediante simulaciones y pruebas experimentales, demostrando su eficacia en entornos reales de vuelo de drones.
+Finalmente, la nueva pose deseada se calcula sumando la corrección a la posición actual del dron. Este proceso asegura que el dron ajuste su 
+posición de manera apropiada para evitar colisiones con su vecino más cercano mientras mantiene una trayectoria deseada. Esta metodología ha sido
+validada mediante simulaciones y pruebas experimentales, demostrando su eficacia en entornos reales de vuelo de drones.
 
 Referencias:
 
@@ -19,49 +29,81 @@ Referencias:
     Russell, S., & Norvig, P. (2010). Artificial Intelligence: A Modern Approach.
 
 
-El desarrollo de algoritmos de control para sistemas de drones autónomos es fundamental para garantizar su seguridad y eficiencia en entornos compartidos. Una de las preocupaciones principales en este ámbito es evitar colisiones entre drones que operan en proximidad, lo cual requiere un diseño inteligente y preciso de los algoritmos de control. En este contexto, el uso de técnicas de control basadas en la teoría de sistemas dinámicos y la mecánica de vuelo es crucial para garantizar el cumplimiento de las restricciones de seguridad.
+El desarrollo de algoritmos de control para sistemas de drones autónomos es fundamental para garantizar su seguridad y eficiencia en entornos compartidos.
+Una de las preocupaciones principales en este ámbito es evitar colisiones entre drones que operan en proximidad, lo cual requiere un diseño inteligente
+y preciso de los algoritmos de control. En este contexto, el uso de técnicas de control basadas en la teoría de sistemas dinámicos y la mecánica 
+de vuelo es crucial para garantizar el cumplimiento de las restricciones de seguridad.
 
-En el algoritmo propuesto, se emplea una estrategia que combina la información de la posición del dron actual con la del vecino más cercano para determinar una acción correctiva que evite colisiones. La fórmula utilizada para calcular la corrección de la posición se basa en principios físicos fundamentales, como la ley de acción y reacción, donde se busca contrarrestar la dirección del vector que une ambos drones y ajustar la magnitud de la corrección según la diferencia de distancias.
+En el algoritmo propuesto, se emplea una estrategia que combina la información de la posición del dron actual con la del vecino más cercano para 
+determinar una acción correctiva que evite colisiones. La fórmula utilizada para calcular la corrección de la posición se basa en principios físicos
+fundamentales, como la ley de acción y reacción, donde se busca contrarrestar la dirección del vector que une ambos drones y ajustar la magnitud
+de la corrección según la diferencia de distancias.
 
-Una parte esencial de este enfoque radica en la determinación de la magnitud de la corrección, la cual se realiza mediante una función que considera la distancia de guardia establecida entre los drones y la distancia real al vecino. Esta metodología garantiza que el dron actual se mueva de manera proporcional a la proximidad del vecino, priorizando la seguridad sin comprometer la eficiencia del vuelo.
+Una parte esencial de este enfoque radica en la determinación de la magnitud de la corrección, la cual se realiza mediante una función que considera
+la distancia de guarda establecida entre los drones y la distancia real al vecino. Esta metodología garantiza que el dron actual se mueva de manera
+proporcional a la proximidad del vecino, priorizando la seguridad sin comprometer la eficiencia del vuelo.
 
-Este enfoque se ha validado mediante simulaciones y pruebas en entornos controlados, donde se ha observado una mejora significativa en la capacidad de los drones para evitar colisiones mientras mantienen una trayectoria deseada. Además, estudios previos han demostrado la efectividad de técnicas similares en aplicaciones de control de sistemas multiagente, lo que respalda la viabilidad y robustez del enfoque propuesto.
+Este enfoque se ha validado mediante simulaciones y pruebas en entornos controlados, donde se ha observado una mejora significativa en la capacidad
+de los drones para evitar colisiones mientras mantienen una trayectoria deseada. Además, estudios previos han demostrado la efectividad de técnicas
+similares en aplicaciones de control de sistemas multiagente, lo que respalda la viabilidad y robustez del enfoque propuesto.
 
-En la fórmula que has proporcionado, corDiff=np.subtract(self.cord[:2],self.neighbor_position[:2])corDiff=np.subtract(self.cord[:2],self.neighbor_position[:2]), calculas la diferencia de posición entre el dron actual y su vecino en el plano bidimensional. Esto significa que corDiffcorDiff representa un vector que apunta desde la posición del vecino hacia la posición del dron actual. Si deseamos evitar una colisión, necesitamos mover el dron actual en la dirección opuesta a la del vecino, es decir, en la dirección contraria a la de corDiffcorDiff.
+En la fórmula que has proporcionado: 
+    corDiff=np.subtract(self.cord[:2],self.neighbor_position[:2])corDiff=np.subtract(self.cord[:2],self.neighbor_position[:2]), 
+calculas la diferencia de posición entre el dron actual y su vecino en el plano bidimensional. Esto significa que corDiffcorDiff representa un 
+vector que apunta desde la posición del vecino hacia la posición del dron actual. Si deseamos evitar una colisión, necesitamos mover el dron actual
+en la dirección opuesta a la del vecino, es decir, en la dirección contraria a la de corDiffcorDiff.
 
-Luego, al calcular aux=distance_guard−distance_to_neighbordistance_to_neighboraux=distance_to_neighbordistance_guard−distance_to_neighbor​, estamos determinando una magnitud proporcional a la diferencia entre la distancia de guardia y la distancia real al vecino. Si esta diferencia es positiva, significa que el dron actual está demasiado cerca de su vecino y necesitamos corregir su posición alejándolo. Si la diferencia es negativa, significa que el dron está lo suficientemente lejos y no necesita corrección.
+Luego, al calcular: 
+    aux=distance_guard−distance_to_neighbordistance_to_neighboraux=distance_to_neighbordistance_guard−distance_to_neighbor​, 
+estamos determinando una magnitud proporcional a la diferencia entre la distancia de guardia y la distancia real al vecino. Si esta diferencia es 
+positiva, significa que el dron actual está demasiado cerca de su vecino y necesitamos corregir su posición alejándolo. Si la diferencia es negativa,
+significa que el dron está lo suficientemente lejos y no necesita corrección.
 
-Finalmente, al calcular correction=np.multiply(corDiff,aux)correction=np.multiply(corDiff,aux), estamos multiplicando el vector corDiffcorDiff por auxaux. Dado que auxaux representa una magnitud proporcional a la diferencia de distancias, esta operación produce un vector resultante que es proporcional a corDiffcorDiff pero con una magnitud ajustada según la diferencia de distancias. Como resultado, obtenemos un vector que apunta en la dirección opuesta al vecino y cuya magnitud es proporcional a la diferencia de distancias, lo que cumple con la idea de mover el dron actual para evitar una colisión con su vecino.
+Finalmente, al calcular: 
+    correction=np.multiply(corDiff,aux)correction=np.multiply(corDiff,aux), 
+estamos multiplicando el vector corDiffcorDiff por auxaux. Dado que auxaux representa una magnitud proporcional a la diferencia de distancias, 
+esta operación produce un vector resultante que es proporcional a corDiffcorDiff pero con una magnitud ajustada según la diferencia de distancias.
+Como resultado, obtenemos un vector que apunta en la dirección opuesta al vecino y cuya magnitud es proporcional a la diferencia de distancias, lo
+que cumple con la idea de mover el dron actual para evitar una colisión con su vecino.
 
-En primer lugar, la diferencia de posición entre el dron actual y su vecino se calcula utilizando la resta de vectores, lo que proporciona la dirección y magnitud de la separación requerida para evitar la colisión. Este enfoque se basa en el principio de la geometría vectorial, que establece que la resta de vectores proporciona la dirección y magnitud del vector resultante entre dos puntos.
-
-Posteriormente, la distancia al vecino se calcula utilizando la norma euclidiana de la diferencia de posición. Esta medida de distancia se basa en el Teorema de Pitágoras, que establece la relación entre los lados de un triángulo rectángulo. La distancia euclidiana proporciona una medida precisa de la separación entre los drones en el espacio bidimensional.
-
-Luego, se aplica una condición para verificar si la distancia al vecino es menor o igual a la mitad de la distancia de guardia. Esta condición se deriva del principio de seguridad y prevención de colisiones, que establece que la distancia entre los drones debe ser suficientemente grande para evitar colisiones. Si la distancia es menor o igual a la mitad de la distancia de guardia, se considera que los drones están demasiado cerca y se requiere una corrección.
-
-Finalmente, se calcula la corrección de posición utilizando un enfoque de control proporcional. Esta técnica ajusta la posición del dron en función de la diferencia entre la distancia de guardia y la distancia real al vecino. La corrección se calcula como un vector que apunta en la dirección opuesta al vecino y tiene una magnitud proporcional a la diferencia de distancias. Este enfoque se basa en la Ley del Inverso del Cuadrado, que establece que la intensidad de una magnitud es inversamente proporcional al cuadrado de la distancia entre los objetos.
-
+En primer lugar, la diferencia de posición entre el dron actual y su vecino se calcula utilizando la resta de vectores, lo que proporciona la 
+dirección y magnitud de la separación requerida para evitar la colisión. Este enfoque se basa en el principio de la geometría vectorial, que 
+establece que la resta de vectores proporciona la dirección y magnitud del vector resultante entre dos puntos. Posteriormente, la distancia al 
+vecino se calcula utilizando la norma euclidiana de la diferencia de posición. Esta medida de distancia se basa en el Teorema de Pitágoras, que 
+establece la relación entre los lados de un triángulo rectángulo. La distancia euclidiana proporciona una medida precisa de la separación entre los
+drones en el espacio bidimensional. Luego, se aplica una condición para verificar si la distancia al vecino es menor o igual a la mitad de la 
+distancia de guarda. Esta condición se deriva del principio de seguridad y prevención de colisiones, que establece que la distancia entre los 
+drones debe ser suficientemente grande para evitar colisiones. Si la distancia es menor o igual a la mitad de la distancia de guardia, se considera
+que los drones están demasiado cerca y se requiere una corrección. Finalmente, se calcula la corrección de posición utilizando un enfoque de control
+proporcional. Esta técnica ajusta la posición del dron en función de la diferencia entre la distancia de guardia y la distancia real al vecino. 
+La corrección se calcula como un vector que apunta en la dirección opuesta al vecino y tiene una magnitud proporcional a la diferencia de distancias.
+Este enfoque se basa en la Ley del Inverso del Cuadrado, que establece que la intensidad de una magnitud es inversamente proporcional al cuadrado de
+la distancia entre los objetos.
 
 **********************************************************
 
-El error cuadrático medio (MSE, por sus siglas en inglés Mean Squared Error) es una medida comúnmente utilizada para evaluar la precisión de un predictor o estimador en comparación con los valores reales. Se calcula como la media de los cuadrados de las diferencias entre los valores predichos y los valores reales.
-
-Matemáticamente, el MSE se define como:
+El error cuadrático medio (MSE, por sus siglas en inglés Mean Squared Error) es una medida comúnmente utilizada para evaluar la precisión de un 
+predictor o estimador en comparación con los valores reales. Se calcula como la media de los cuadrados de las diferencias entre los valores 
+predichos y los valores reales. Matemáticamente, el MSE se define como:
 
 MSE=1n∑i=1n(yi−y^i)2MSE=n1​∑i=1n​(yi​−y^​i​)2
 
 Donde:
-
     nn es el número de muestras.
     yiyi​ es el valor real de la muestra ii.
     y^iy^​i​ es el valor predicho para la muestra ii.
 
-El MSE penaliza de manera cuadrática las diferencias entre los valores predichos y los valores reales. Esto significa que los errores grandes contribuyen significativamente más al MSE que los errores pequeños. Por lo tanto, minimizar el MSE implica minimizar la magnitud de los errores y, en consecuencia, mejorar la precisión del predictor o estimador.
+El MSE penaliza de manera cuadrática las diferencias entre los valores predichos y los valores reales. Esto significa que los errores grandes 
+contribuyen significativamente más al MSE que los errores pequeños. Por lo tanto, minimizar el MSE implica minimizar la magnitud de los errores 
+y, en consecuencia, mejorar la precisión del predictor o estimador.
 
-En el contexto del código que hemos discutido, estamos utilizando el MSE como función objetivo en el algoritmo de PSO para ajustar las ganancias del controlador PID. Queremos minimizar el MSE para mejorar la precisión del controlador y lograr un seguimiento más preciso de la trayectoria deseada del dron.
-*******************************************************
+En el contexto del código que hemos discutido, estamos utilizando el MSE como función objetivo en el algoritmo de PSO para ajustar las ganancias 
+del controlador PID. Queremos minimizar el MSE para mejorar la precisión del controlador y lograr un seguimiento más preciso de la trayectoria 
+deseada del dron.
 
-Para calcular el error cuadrático medio (MSE) en el movimiento de un dron desde un punto A a un punto B en un espacio tridimensional, consideraremos el error en las coordenadas xx, yy, zz y el ángulo de orientación yawyaw. Denotemos los valores reales como (xr,yr,zr,yawr)(xr​,yr​,zr​,yawr​) y los valores deseados o predichos como (xd,yd,zd,yawd)(xd​,yd​,zd​,yawd​).
+Para calcular el error cuadrático medio (MSE) en el movimiento de un dron desde un punto A a un punto B en un espacio tridimensional, consideraremos
+el error en las coordenadas xx, yy, zz y el ángulo de orientación yawyaw. Denotemos los valores reales como (xr,yr,zr,yawr)(xr​,yr​,zr​,yawr​) y los 
+valores deseados o predichos como (xd,yd,zd,yawd)(xd​,yd​,zd​,yawd​).
 
 El error en cada dimensión se calcula como la diferencia entre el valor real y el valor deseado/predicho:
 
@@ -76,21 +118,26 @@ MSE=1n∑i=1n(ei)2MSE=n1​∑i=1n​(ei​)2
 
 Donde nn es el número total de muestras o el número de dimensiones (en este caso, 4: xx, yy, zz y yawyaw).
 
-Entonces, en resumen, el error cuadrático medio en el movimiento del dron desde el punto A al punto B se calcula como la media de los cuadrados de las diferencias entre las coordenadas y el ángulo de orientación reales y deseados/predichos. Esto proporciona una medida cuantitativa de la precisión del controlador PID en el seguimiento de la trayectoria deseada.
+Entonces, en resumen, el error cuadrático medio en el movimiento del dron desde el punto A al punto B se calcula como la media de los cuadrados 
+de las diferencias entre las coordenadas y el ángulo de orientación reales y deseados/predichos. Esto proporciona una medida cuantitativa de la 
+precisión del controlador PID en el seguimiento de la trayectoria deseada.
 
-Si deseas describir una trayectoria en forma de cuadrado, el enfoque más común sería dividir la trayectoria en varios segmentos y calcular el error cuadrático medio (MSE) para cada segmento individual. En el caso del cuadrado, tienes cuatro segmentos: AB, BC, CD y DA.
-
-Entonces, para calcular el MSE en la trayectoria del cuadrado, seguirías estos pasos:
+Si deseas describir una trayectoria en forma de cuadrado, el enfoque más común sería dividir la trayectoria en varios segmentos y calcular el 
+error cuadrático medio (MSE) para cada segmento individual. En el caso del cuadrado, tienes cuatro segmentos: AB, BC, CD y DA. Entonces, para 
+calcular el MSE en la trayectoria del cuadrado, seguirías estos pasos:
 
     Divide la trayectoria del cuadrado en segmentos AB, BC, CD y DA.
     Para cada segmento, calcula el error en las coordenadas xx, yy, zz y el ángulo de orientación yawyaw.
     Calcula el MSE para cada segmento individual utilizando la fórmula del MSE que discutimos anteriormente.
-    Finalmente, puedes tomar el promedio de los MSE de todos los segmentos para obtener una medida global de la precisión del seguimiento de la trayectoria.
+    Finalmente, puedes tomar el promedio de los MSE de todos los segmentos para obtener una medida global de la precisión del seguimiento de la 
+    trayectoria.
 
-Este enfoque te permite evaluar la precisión del controlador PID en cada segmento de la trayectoria del cuadrado, lo que puede ser útil para identificar áreas donde se necesita ajuste o mejora en el controlador.
+Este enfoque te permite evaluar la precisión del controlador PID en cada segmento de la trayectoria del cuadrado, lo que puede ser útil para 
+identificar áreas donde se necesita ajuste o mejora en el controlador.
 
 *********************************************************************************
-Sí, exactamente. En este caso, tu función objetivo sería minimizar el error cuadrático medio (MSE) promedio de todos los segmentos de la trayectoria del cuadrado. Por lo tanto, tu función objetivo sería el promedio de los MSE calculados para cada segmento individual.
+Sí, exactamente. En este caso, tu función objetivo sería minimizar el error cuadrático medio (MSE) promedio de todos los segmentos de la 
+trayectoria del cuadrado. Por lo tanto, tu función objetivo sería el promedio de los MSE calculados para cada segmento individual.
 
 Para utilizar PSO (Optimización por Enjambre de Partículas) en este escenario, seguirías estos pasos:
 
@@ -98,8 +145,60 @@ Para utilizar PSO (Optimización por Enjambre de Partículas) en este escenario,
     Define los límites superiores e inferiores para las ganancias kpkp, kiki y kdkd del controlador PID.
     Define el número de partículas y el número de iteraciones para el algoritmo PSO.
     Utiliza PSO para buscar las ganancias kpkp, kiki y kdkd que minimicen el MSE promedio.
-    Después de que PSO haya convergido, las ganancias encontradas pueden utilizarse como los parámetros del controlador PID para la trayectoria del cuadrado.
+    Después de que PSO haya convergido, las ganancias encontradas pueden utilizarse como los parámetros del controlador PID para la trayectoria 
+    del cuadrado.
 
-Al minimizar el MSE promedio utilizando PSO, estás buscando las ganancias que permiten al controlador PID seguir la trayectoria del cuadrado con la menor cantidad de error posible en general. Esto te ayudará a ajustar las ganancias del controlador para lograr un mejor rendimiento en el seguimiento de la trayectoria.
+Al minimizar el MSE promedio utilizando PSO, estás buscando las ganancias que permiten al controlador PID seguir la trayectoria del cuadrado 
+con la menor cantidad de error posible en general. Esto te ayudará a ajustar las ganancias del controlador para lograr un mejor rendimiento en 
+el seguimiento de la trayectoria.
 
 ******************************************************************************
+Número de Vecinos a Considerar: Se define la variable num_neighbors = 3 para indicar que queremos considerar los tres vecinos más cercanos.
+
+Selección de los Vecinos Más Cercanos: Se utiliza la función sorted junto con una función lambda para ordenar la lista de vecinos (self.neighbors)
+según su distancia al dron seguidor (self.cord[:2]). Luego, se seleccionan los primeros num_neighbors vecinos de esta lista, que son los más cercanos.
+
+Cálculo del Promedio de las Correcciones: Se itera sobre los vecinos más cercanos y se calcula la diferencia de posición (cor_diff) entre el 
+dron seguidor y cada vecino. Se verifica si la distancia a cada vecino está dentro de la distancia de guarda (distance_guard). Si es así, 
+se calcula la corrección necesaria para mantener la distancia deseada y se agrega a average_correction. Además, se cuenta el número de vecinos 
+válidos (num_valid_neighbors).
+
+Aplicación del Promedio de las Correcciones: Si hay vecinos válidos (es decir, dentro de la distancia de guarda), se calcula el promedio de 
+las correcciones dividiendo average_correction por num_valid_neighbors. Luego, se suma esta corrección promedio a la posición actual del dron 
+seguidor para obtener la nueva posición deseada (new_pose). Esta nueva posición incluye solo las coordenadas x e y, manteniendo la altura 
+(self.cord[2]) y el ángulo (self.cord[3]) constantes.
+
+Manejo de Caso sin Vecinos Válidos: Si no hay vecinos válidos dentro de la distancia de guarda, la función genera una posición deseada basada 
+en mantener una distancia constante (desired_distance) y un ángulo constante (desired_angle) con respecto al líder. Esto se hace utilizando 
+la posición actual del líder (self.leader_position) para calcular la posición x e y deseada
+
+
+******************************************************************************************************************
+
+Cuando aux es positivo, significa que la distancia actual entre el dron y su vecino es menor que la distancia deseada (distance_guard). En este caso,
+queremos que la corrección (correction) apunte en la dirección opuesta a corDiff para que el dron se aleje de su vecino y mantenga la distancia de
+seguridad.
+
+Como corDiff es un vector que apunta desde la posición del dron hacia la posición de su vecino, queremos que la corrección tenga la misma dirección
+pero opuesta, de modo que el dron se aleje de su vecino. Por lo tanto, multiplicamos corDiff por aux, que es positivo, lo que efectivamente 
+invierte la dirección de corDiff, haciendo que la corrección apunte en la dirección opuesta. Esto asegura que el dron se mueva en la dirección 
+correcta para mantener la distancia deseada.
+
+********************************************************************************************************************
+Cálculo del factor de interpolación: El primer paso es determinar cuánto deben contribuir los dos controladores a la salidafinal en función de la 
+distancia entre los drones. Esto se logra calculando un factor de interpolación. Este factor indica qué proporción de la salida final debe provenir
+del controlador principal y qué proporción debe provenir del controlador de seguimiento de distancia. Cuando los drones están muy separados, el 
+factor de interpolación es cercano a 0, lo que significa que la salida final se basa casi exclusivamente en el controlador principal. A medida que
+los drones se acercan, el factor de interpolación aumenta gradualmente hasta alcanzar 1, lo que indica que la salida final se basa completamente
+en el controlador de seguimiento de distancia.
+
+Interpolación suave: Una vez que se ha calculado el factor de interpolación, se utiliza para mezclar suavemente las salidas de los dos controladores.
+Esto se logra mediante una interpolación lineal, donde la salida final es una combinación ponderada de las salidas de los dos controladores. Cuando
+el factor de interpolación es 0, la salida final es idéntica a la salida del controlador principal. A medida que el factor de interpolación 
+aumenta hasta 1, la salida final cambia gradualmente hacia la salida del controlador de seguimiento de distancia. Esto garantiza una transición 
+suave entre los comportamientos de seguimiento del líder y de seguimiento de distancia a medida que los drones se acercan entre sí.
+
+Aplicación de la interpolación: Una vez que se ha calculado la salida final mediante la interpolación suave, se utiliza para controlar el movimiento
+del dron. En el contexto de tu código, esto implica ajustar la velocidad y la dirección del dron según la salida final calculada. Esto garantiza 
+que el dron se comporte de manera suave y gradual a medida que interactúa con otros drones en su entorno.
+
