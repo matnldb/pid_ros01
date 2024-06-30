@@ -2,17 +2,17 @@
 import numpy as np
 import rospy
 from hector_uav_msgs.srv import EnableMotors
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import Twist, PoseStamped
 from tf.transformations import euler_from_quaternion
 
-import sys, select, os #Handling command line arguments
+import sys, select, os # Handling command line arguments
 if os.name == 'nt':
   import msvcrt
 else:
   import tty, termios
 
-def getKey(): #Function to use keyboard events on Linux
+def getKey(): # Function to use keyboard events on Linux
     if os.name == 'nt':
       return msvcrt.getch()
 
@@ -28,19 +28,22 @@ def getKey(): #Function to use keyboard events on Linux
 
 kp = [0.25, 0.25, 0.5, 1.5]
 kd = [0.05, 0.05, 0.05, 0]
-kp_col = [0.25, 0.25, 0.5, 1.5]
-kd_col = [0.05, 0.05, 0.05, 0]
-distance_guard = np.sqrt(2)
+ki = [0, 0, 0, 0]
 
 class Drone(object):
-    def __init__(self, name):
-        self.name = name
+    def __init__(self):
         self.vel = Twist()
-        self.cord = [0, 0, 0, 0]  # [x, y, z, yaw]
-        self.vel_pub = rospy.Publisher(self.name + '/cmd_vel', Twist, queue_size=10)
-        self.pose_sub = rospy.Subscriber(self.name + '/ground_truth/state', Odometry, self.poseCallback)
-        self.enable_motors()  # Habilita los motores al inicializar el dron
-        self.takeoff_complete = False  # Bandera para indicar si el despegue ha sido completado
+        self.cord = [0, 0, 0, 0]  # Coordinates [x, y, z, yaw]
+        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.poseCallback)
+        self.path_pub = rospy.Publisher('/path', Path, queue_size=10)  # Actual path publisher
+        self.tr_path_pub = rospy.Publisher('/tr_path', Path, queue_size=10)  # Desired path publisher
+        self.actual_path = Path()
+        self.desired_path = Path()
+        self.actual_path.header.frame_id = "world"  # Set the frame id to world
+        self.desired_path.header.frame_id = "world"
+        self.enable_motors()  # Enable motors upon initializing the drone
+        self.takeoff_complete = False  # Flag to indicate if takeoff has been completed
         self.ex = [0, 0, 0, 0]
         self.ex0 = [0, 0, 0, 0]
 
@@ -50,29 +53,34 @@ class Drone(object):
         quater = msg.pose.pose.orientation
         quater_list = [quater.x, quater.y, quater.z, quater.w]
         (_, _, self.cord[3]) = euler_from_quaternion(quater_list)
+        # Append current drone position to the actual path
+        pose_stamped = PoseStamped()
+        pose_stamped.pose = msg.pose.pose
+        pose_stamped.header.stamp = rospy.Time.now()
+        self.actual_path.poses.append(pose_stamped)
+        self.path_pub.publish(self.actual_path)  # Publish the actual path
 
     def enable_motors(self):
-        rospy.wait_for_service(self.name + '/enable_motors')
-        enable_motors = rospy.ServiceProxy(self.name + '/enable_motors', EnableMotors)
+        rospy.wait_for_service('/enable_motors')
+        enable_motors = rospy.ServiceProxy('/enable_motors', EnableMotors)
         enable_motors(True)
 
     def take_off(self):
         if not self.takeoff_complete:
-            # Si no se ha completado el despegue, ascender gradualmente hasta alcanzar 2 metros
             if self.cord[2] < 2:
                 self.vel.linear.z = 0.1
             else:
                 self.vel.linear.z = 0.0
-                self.takeoff_complete = True  # Marcar el despegue como completado
+                self.takeoff_complete = True
         else:
-            self.vel.linear.z = 0.0  # El despegue ya ha sido completado, mantener la altitud constante
-    
+            self.vel.linear.z = 0.0
+
     def calculate_error(self, desired_position):
         self.ex0 = self.ex
         self.ex = np.subtract(desired_position, self.cord)
         return self.ex
 
-    def PID(self, kp, kd, error):
+    def PID(self, kp, ki, kd, error):
         d_ex = np.subtract(error, self.ex0) * 100
         p = np.multiply(error, kp)
         d = np.multiply(d_ex, kd)
@@ -86,136 +94,47 @@ class Drone(object):
         self.vel.angular.z = pid[3]
 
 class Lider(Drone):
-    def __init__(self, name):
-        super(Lider, self).__init__(name)  # Llama a super() sin argumentos
+    def __init__(self):
+        super(Lider, self).__init__()  # Llama a super() sin argumentos
         self.square_trajectory = generate_square_trajectory()  
         self.current_vertex = 0  
         self.next_vertex = 1 
 
     def determine_desired_pose(self, number=0):
-        # Obtiene la posicin deseada del vrtice actual en la trayectoria
-        if np.all(np.abs(self.ex) < 0.05):  # Condicin de error pequeo, ajusta este valor segn sea necesario
+        if np.all(np.abs(self.ex) < 0.05):
             self.current_vertex = self.next_vertex
             self.next_vertex = (self.next_vertex + 1) % len(self.square_trajectory)
-        else:
-            pass
-        return self.square_trajectory[self.current_vertex]
+        desired_pose = self.square_trajectory[self.current_vertex]
+        # Append desired pose to the desired path
+        pose_stamped = PoseStamped()
+        pose_stamped.pose.position.x, pose_stamped.pose.position.y, pose_stamped.pose.position.z = desired_pose[:3]
+        pose_stamped.header.stamp = rospy.Time.now()
+        self.desired_path.poses.append(pose_stamped)
+        self.tr_path_pub.publish(self.desired_path)  # Publish the desired path
+        return desired_pose
 
 def generate_square_trajectory():
-    square_trajectory = [
-        (0, 0,2,0),  # Primer vrtice del cuadrado
-        (0, 2,2,0),  # Segundo vrtice del cuadrado
-        (2, 2,2,0),  # Tercer vrtice del cuadrado
-        (2, 0,2,0),  # Cuarto vrtice del cuadrado
+    return [
+        (0, 0, 2, 0),
+        (0, 2, 2, 0),
+        (2, 2, 2, 0),
+        (2, 0, 2, 0)
     ]
-    return square_trajectory
-
-class Seguidor(Drone):
-    def __init__(self, name, Lider, Vecino):
-        super(Seguidor, self).__init__(name)
-        self.lider = Lider.name
-        self.vecino = Vecino
-        self.leader_position = [0, 0, 0, 0]
-        self.neighbor_position = [0, 0, 0, 0]
-        rospy.Subscriber(self.lider+'/ground_truth/state', Odometry, self.leaderPoseCallback)
-        rospy.Subscriber(self.vecino+'/ground_truth/state', Odometry, self.neighborPoseCallback)
-        self.exCol = [0,0,0,0]
-        self.ex0Col = [0,0,0,0]
-        self.dst_Vcn =  np.sqrt(2)
-
-    def leaderPoseCallback(self, msg):
-        pos = msg.pose.pose.position
-        self.leader_position[:3] = [pos.x, pos.y, pos.z]
-        quater = msg.pose.pose.orientation
-        quater_list = [quater.x, quater.y, quater.z, quater.w]
-        (_, _, self.leader_position[3]) = euler_from_quaternion(quater_list)
-
-    def neighborPoseCallback(self, msg):
-        pos = msg.pose.pose.position
-        self.neighbor_position[:3] = [pos.x, pos.y, pos.z]
-        quater = msg.pose.pose.orientation
-        quater_list = [quater.x, quater.y, quater.z, quater.w]
-        (_, _, self.neighbor_position[3]) = euler_from_quaternion(quater_list)
-        
-
-    def determine_cercania(self):
-        global distance_guard
-        corDiff = np.subtract((self.cord[:2]),(self.neighbor_position[:2]))
-        self.dst_Vcn = np.linalg.norm(corDiff) 
-        if self.dst_Vcn < distance_guard:
-            aux = (distance_guard - self.dst_Vcn) / self.dst_Vcn
-            correction = np.multiply(corDiff,aux)
-            newPose =  np.add(self.cord[:2],correction)
-            return np.hstack((newPose, self.cord[2:4]))
-        else: 
-            return np.hstack((self.cord[:2], self.cord[2:4]))
-        
-    
-    def determine_desired_pose(self, desired_angle):       
-            desired_distance = 2
-            x, y, z, yaw = self.leader_position  # Utilizar la posicin del ler actualizada
-            desired_x = x + desired_distance * np.cos(np.radians(desired_angle))
-            desired_y = y + desired_distance * np.sin(np.radians(desired_angle))
-            return [desired_x, desired_y, z-0.4, yaw]  # Por ejemplo, mantener la misma altitud que el lder
-
-def smooth_transition(output_main, output_distance, distance_to_neighbor, distance_guard):
-    # Calcula el factor de interpolacn basado en la distancia entre los drones
-    interpolation_factor = min(distance_to_neighbor / distance_guard, 1.0)  # Limita el factor a 1.0 como mximo
-    # Interpola suavemente entre las salidas de los dos controladores
-    smoothed_output = output_main * (1 - interpolation_factor) + output_distance * interpolation_factor
-    return smoothed_output
 
 def main_function():
     rospy.init_node("pid", anonymous=True)
     rate = rospy.Rate(50)
-
-    lider = Lider("uav1")
-    seguidor1 = Seguidor("uav2",lider,"uav3" )
-    seguidor2 = Seguidor("uav3",lider,"uav2")    
-
+    lider = Lider()
 
     while not rospy.is_shutdown():
         lider.take_off()
-        seguidor1.take_off()
-        seguidor2.take_off()
-
-        if lider.takeoff_complete and seguidor1.takeoff_complete:
-            
-            deseadas_lider = lider.determine_desired_pose(0)
-            deseadas_seguidor = seguidor1.determine_desired_pose(45)           
-            deseadas_seguidor2= seguidor2.determine_desired_pose(135)
-            
-            error_lider = lider.calculate_error(deseadas_lider)
-            error_seguidor1 = seguidor1.calculate_error(deseadas_seguidor)
-            error_seguidor2 = seguidor2.calculate_error(deseadas_seguidor2) 
-
-            alejar1 = seguidor1.determine_cercania()
-            alejar2 = seguidor2.determine_cercania()
-
-            error_alejar1 = seguidor1.calculate_error(alejar1)
-            error_alejar2 = seguidor2.calculate_error(alejar2)
-
-            pl = lider.PID(kp,kd,error_lider)
-            ps1 = seguidor1.PID(kp, kd,error_seguidor1)
-            ps2 = seguidor2.PID(kp, kd,error_seguidor2)
-
-            pd_alejar1 = seguidor1.PID(kp_col,kd_col, error_alejar1)
-            pd_alejar2 = seguidor1.PID(kp_col,kd_col, error_alejar2)
-
+        if lider.takeoff_complete:
+            desired_lider = lider.determine_desired_pose(0)
+            error_lider = lider.calculate_error(desired_lider)
+            pl = lider.PID(kp, ki, kd, error_lider)
             lider.movement(pl)
-            
-            smoothed_ps1 = smooth_transition(ps1, pd_alejar1, seguidor1.dst_Vcn, distance_guard)
-            smoothed_ps2 = smooth_transition(ps2, pd_alejar2, seguidor1.dst_Vcn, distance_guard)
-
-            seguidor1.movement(smoothed_ps1)
-            seguidor2.movement(smoothed_ps2)
-
 
         lider.vel_pub.publish(lider.vel)
-        seguidor1.vel_pub.publish(seguidor1.vel) 
-        seguidor2.vel_pub.publish(seguidor2.vel)        
-
-
         rate.sleep()
 
 if __name__ == '__main__':

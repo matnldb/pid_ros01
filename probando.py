@@ -95,8 +95,7 @@ def main_function():
         ppid = PID(kp,ki,kd,ex,ex0)
         ex0 = np.copy(ex)
         print("  ")
-        # mov(Saturacion(ppid,0.9)) 
-        mov([0.025,0,0,0]) 
+        mov(Saturacion(ppid,0.9)) 
             
         cmd_vel_publisher.publish(vel)
         rate.sleep() 
